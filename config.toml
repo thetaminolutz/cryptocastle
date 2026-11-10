@@ -1,0 +1,23 @@
+# Einstellungen für den cryptocastle-Bot
+
+[bot]
+# "paper" = nur simulieren (Standard), "live" = echtes Geld auf Kraken
+mode = "paper"
+exchange = "kraken"
+symbol = "BTC/EUR"
+# So viel Euro bekommt der Bot pro Monat. Mehr darf er nie ausgeben.
+monthly_budget_eur = 5.0
+
+[strategy]
+# Trend-Filter: Gleitender Durchschnitt über so viele Tage
+sma_days = 200
+# Absturz-Schutz: Verkaufen, wenn der Kurs so viel % unter dem Durchschnitt liegt
+crash_exit_pct = 15.0
+# Kleinster Kauf in Euro (Kraken-Mindestorder liegt bei wenigen Euro)
+min_order_eur = 5.0
+
+[safety]
+# Notbremse: Bot stoppt, wenn das Bot-Vermögen so viel % unter den Einzahlungen liegt
+max_loss_pct = 50.0
+# Angenommene Gebühr pro Trade für Simulation und Backtest (Kraken Taker ~0,4 %)
+fee_pct = 0.4

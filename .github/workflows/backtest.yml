@@ -1,0 +1,19 @@
+name: Backtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "Startdatum (JJJJ-MM-TT)"
+        default: "2018-01-01"
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m cryptocastle.backtest --since "${{ inputs.since }}"
