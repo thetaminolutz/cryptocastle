@@ -10,8 +10,14 @@ import ccxt
 from .config import Config
 
 
+def _proxy_opts() -> dict:
+    """Übernimmt einen gesetzten HTTPS-Proxy (ccxt ignoriert die Umgebungsvariable sonst)."""
+    proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+    return {"httpsProxy": proxy} if proxy else {}
+
+
 def public_exchange(exchange_id: str) -> ccxt.Exchange:
-    return getattr(ccxt, exchange_id)({"enableRateLimit": True})
+    return getattr(ccxt, exchange_id)({"enableRateLimit": True, **_proxy_opts()})
 
 
 def market_snapshot(ex: ccxt.Exchange, symbol: str, days: int) -> tuple[float, list[float]]:
@@ -38,7 +44,7 @@ class LiveTrader:
             )
         self.cfg = cfg
         self.ex = getattr(ccxt, cfg.exchange)(
-            {"apiKey": key, "secret": secret, "enableRateLimit": True}
+            {"apiKey": key, "secret": secret, "enableRateLimit": True, **_proxy_opts()}
         )
         self.market = self.ex.load_markets()[cfg.symbol]
         self.base, self.quote = self.market["base"], self.market["quote"]
