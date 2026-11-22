@@ -1,0 +1,79 @@
+// Player-tweakable settings, persisted in localStorage (small, non-critical).
+// Saves (game state) go to IndexedDB in M5.
+
+export type QualityPreset = 'low' | 'medium' | 'high';
+
+export interface Settings {
+  quality: QualityPreset;
+  viewDistance: number;   // chunks, 4..10
+  renderScale: number;    // 0.3..0.75 of screen resolution
+  fpsCap: 30 | 60;
+  shadows: boolean;
+  showFps: boolean;
+  autoQuality: boolean;
+  particles: number;      // 0..1
+  masterVolume: number;
+  musicVolume: number;
+  sfxVolume: number;
+  ambienceVolume: number;
+  joystickSize: number;   // px radius
+  cameraSensitivity: number;
+  invertY: boolean;
+  leftHanded: boolean;
+}
+
+export const PRESETS: Record<QualityPreset, Pick<Settings, 'viewDistance' | 'renderScale' | 'particles' | 'shadows'>> = {
+  low: { viewDistance: 4, renderScale: 0.35, particles: 0.4, shadows: false },
+  medium: { viewDistance: 6, renderScale: 0.45, particles: 0.75, shadows: false },
+  high: { viewDistance: 8, renderScale: 0.55, particles: 1, shadows: false }
+};
+
+const DEFAULTS: Settings = {
+  quality: 'medium',
+  ...PRESETS.medium,
+  fpsCap: 60,
+  showFps: true,
+  autoQuality: true,
+  masterVolume: 0.8,
+  musicVolume: 0.6,
+  sfxVolume: 0.8,
+  ambienceVolume: 0.6,
+  joystickSize: 70,
+  cameraSensitivity: 1,
+  invertY: false,
+  leftHanded: false
+};
+
+const KEY = 'duskmere.settings.v1';
+type Listener = (s: Settings, changed: keyof Settings) => void;
+
+class SettingsStore {
+  readonly values: Settings;
+  private listeners: Listener[] = [];
+
+  constructor() {
+    let stored: Partial<Settings> = {};
+    try { stored = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* private mode */ }
+    this.values = { ...DEFAULTS, ...stored };
+  }
+
+  set<K extends keyof Settings>(key: K, value: Settings[K]) {
+    if (this.values[key] === value) return;
+    this.values[key] = value;
+    try { localStorage.setItem(KEY, JSON.stringify(this.values)); } catch { /* ignore */ }
+    for (const l of this.listeners) l(this.values, key);
+  }
+
+  applyPreset(p: QualityPreset) {
+    this.set('quality', p);
+    const v = PRESETS[p];
+    this.set('viewDistance', v.viewDistance);
+    this.set('renderScale', v.renderScale);
+    this.set('particles', v.particles);
+    this.set('shadows', v.shadows);
+  }
+
+  onChange(l: Listener) { this.listeners.push(l); }
+}
+
+export const settings = new SettingsStore();
