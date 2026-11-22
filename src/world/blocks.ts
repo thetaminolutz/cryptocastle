@@ -28,7 +28,7 @@ export const B = {
 
 export const BLOCKS: BlockDef[] = [
   T(B.AIR, 'Air', 'stone', Render.Air, { solid: false }),
-  T(B.GRASS, 'Grass', ['grass_top', 'grass_side', 'dirt']),
+  T(B.GRASS, 'Grass', ['grass_top', 'dirt', 'dirt']),
   T(B.DIRT, 'Dirt', 'dirt'),
   T(B.STONE, 'Stone', 'stone', Render.Opaque, { hardness: 3 }),
   T(B.SAND, 'Sand', 'sand'),
@@ -46,7 +46,7 @@ export const BLOCKS: BlockDef[] = [
   T(B.PINE_LEAVES, 'Pine Needles', 'pine_leaves', Render.Cutout),
   T(B.BIRCH_LOG, 'Birch Log', ['birch_log_top', 'birch_log', 'birch_log_top']),
   T(B.BIRCH_LEAVES, 'Birch Leaves', 'birch_leaves', Render.Cutout),
-  T(B.SNOW_GRASS, 'Snowy Grass', ['snow', 'snow_side', 'dirt']),
+  T(B.SNOW_GRASS, 'Snowy Grass', ['snow', 'dirt', 'dirt']),
   T(B.ICE, 'Ice', 'ice'),
   T(B.MOSS_STONE, 'Mossy Stone', 'moss_stone', Render.Opaque, { hardness: 3 }),
   T(B.LAVA, 'Lava', 'lava', Render.Liquid, { solid: false, light: 15 }),

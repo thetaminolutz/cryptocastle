@@ -11,13 +11,20 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | Milestone | State |
 |---|---|
 | M1 Project setup, PWA, icons, touch-safe CSS, FPS counter | ✅ done |
-| M2 Voxel engine (worker chunk gen, greedy meshing, atlas, low-res pixel pass, fog, day/night) | ✅ done |
-| M3 Player & touch controls (physics, jump, climb, swim, stamina) | next |
+| M2 World engine (worker chunk gen, atlas, low-res pixel pass, fog, day/night) | ✅ done |
+| M3 Smooth terrain + player & touch controls (walk, sprint, jump, climb, swim, dodge, stamina, life, 1st/3rd person) | ✅ done |
+| M4 Biomes, plants, animals, caves, ores, weather | next |
 | M4–M15 | see the feature bible |
 
-Right now you fly over the world with a test camera: left thumb = joystick
-(push to the edge to go fast), drag on the right = look, **Up/Down** buttons = fly
-up/down. Keyboard: WASD, Space, C, Shift. ☰ opens Settings.
+The world is **smooth** (no cubes): terrain is a density field meshed with
+Surface Nets, water is a flat waving surface, trees are smooth low-poly models.
+Surfaces keep crisp pixel-art textures and the low-res pixel render.
+
+Controls (touch): left thumb = floating joystick (push to the edge to sprint),
+drag on the right = camera, **Jump** (tap; hold against a steep wall or a tree to
+climb; in water: swim up), **Dodge** = roll. Look down + forward in water = dive.
+◐ toggles first/third person, ☰ opens Settings.
+Keyboard: WASD, Shift sprint, Space jump/climb, Q dodge.
 
 ## Run locally
 
@@ -73,18 +80,23 @@ scripts/     icon generator (pixel-art PNGs, run automatically on build)
 
 ## Adding content
 
-- **A new block:** add a painter for its texture in `src/world/atlas.ts`, append
-  its tile name to `TILE_NAMES` in `src/world/tiles.ts`, then append a row to
-  `BLOCKS` in `src/world/blocks.ts`. Never renumber existing block IDs (saves
-  store them).
+- **A new terrain material:** add a painter for its texture in `src/world/atlas.ts`,
+  append its tile name to `TILE_NAMES` in `src/world/tiles.ts`, then append a row
+  to `BLOCKS` in `src/world/blocks.ts` (top tile = flat ground, side tile = steep
+  slopes). Never renumber existing IDs (saves store them).
+- **A new tree kind:** add a model in `buildKind()` in `src/world/trees.ts` and
+  place it in `placeTrees()` in `src/world/terrain.ts`.
+- **Player tuning** (speeds, stamina costs, fall damage): `PLAYER_TUNING` in
+  `src/entities/player.ts`.
 - Items, enemies, NPCs and quests will live as data tables in `src/data/`.
 
 ## Performance notes
 
 - 3D is rendered at ~45 % of the physical screen resolution and upscaled with
   nearest-neighbour; the UI stays sharp.
-- Chunks are 16×16×128, generated and greedy-meshed in Web Workers, one opaque
-  and one liquid mesh per chunk. View distance 6 ≈ 85–120 draw calls and
-  ~150–200 k triangles.
+- Chunks are 16×16×128 density samples, generated and meshed (Surface Nets) in
+  Web Workers: one terrain and one liquid mesh per chunk; all trees are drawn
+  with 3 instanced draw calls. View distance 6 ≈ 90–120 draw calls and
+  ~200–280 k triangles.
 - If FPS stays under 45 for 5 s, the game lowers render scale, then view
   distance, then particles (Settings → Auto quality).

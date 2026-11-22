@@ -44,7 +44,7 @@ function rings(outer: RGB, inner: RGB): Px {
 function leaves(base: RGB): Px {
   return (_x, _y, set, r) => {
     const v = r();
-    if (v < 0.17) set([0, 0, 0], 0); // holes → cutout
+    if (v < 0.17) set(mix(base, [0, 0, 0], 0.55), 0); // holes (alpha 0, dark tint when drawn opaque)
     else set(jitter(v > 0.85 ? mix(base, [255, 255, 200], 0.15) : base, r, 0.35));
   };
 }

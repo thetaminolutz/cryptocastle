@@ -113,3 +113,21 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .set-row select, .set-row input[type=range] { min-height: 44px; font-size: 16px; font-family: var(--font); }
 .set-row input[type=range] { width: 220px; touch-action: none; }
 .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; }
+
+/* ---------- HUD bars ---------- */
+.hud-bars {
+  position: absolute; top: calc(12px + var(--sat)); left: calc(14px + var(--sal));
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.bar { width: 220px; height: 12px; background: rgba(0,0,0,.55); border: 2px solid rgba(20,12,10,.9); box-shadow: 0 0 0 1px rgba(200,170,120,.25); }
+.bar .fill { height: 100%; width: 100%; transition: width .15s linear; }
+.bar.life .fill { background: linear-gradient(#e0343c, #8a0f16); }
+.bar.stamina { width: 180px; height: 9px; }
+.bar.stamina .fill { background: linear-gradient(#4c8ee8, #1d4aa0); }
+.bar.breath { width: 140px; height: 7px; display: none; }
+.bar.breath .fill { background: linear-gradient(#c8f0ff, #5aa8d0); }
+.hud-gold { color: var(--gold); font-size: 15px; text-shadow: 1px 1px 0 #000; margin-top: 2px; }
+.view-btn { top: calc(84px + var(--sat)) !important; font-size: 24px !important; }
+.hurt-flash { position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(170, 0, 10, .9) 100%); }
+.fps { top: auto !important; bottom: calc(6px + var(--sab)); }

@@ -1,5 +1,7 @@
-// Custom voxel shader: atlas tiling for greedy quads, baked AO + sky/block light,
-// sun/moon + hemisphere + ambient lighting, linear fog. Shared uniforms drive day/night.
+// World shader for smooth surfaces: pixel-art atlas tiles projected tri-planar in
+// world space (16 px per metre), baked AO + sky/block light, sun/moon + hemisphere +
+// ambient lighting and fog. Also used (with instancing) for trees and props.
+// Shared uniforms drive the day/night cycle.
 import * as THREE from 'three';
 import { ATLAS_TILES } from './constants';
 import { TILE_INDEX } from './tiles';
@@ -20,29 +22,38 @@ export const worldUniforms = {
 };
 
 const vert = /* glsl */`
-  attribute vec2 aUv;
-  attribute vec4 aData;   // tile, ao, sky, block
   attribute vec3 aNormal;
-  varying vec2 vUv;
-  varying float vTile;
-  varying float vAo;
-  varying vec2 vLight;
+  attribute vec2 aTiles;   // top tile, side tile
+  attribute vec3 aLight;   // ao (0..255), sky (0..15), block (0..15)
   varying vec3 vNormal;
-  varying float vFogDepth;
   varying vec3 vWorld;
+  varying vec2 vTiles;
+  varying vec3 vLight;
+  varying float vFogDepth;
   uniform float uTime;
   uniform float uIsLiquid;
+  #ifdef USE_INSTANCING
+  attribute float aSway;
+  #endif
   void main() {
-    vUv = aUv;
-    vTile = aData.x;
-    vAo = aData.y;
-    vLight = aData.zw / 15.0;
-    vNormal = aNormal;
-    vec4 world = modelMatrix * vec4(position, 1.0);
-    if (uIsLiquid > 0.5 && aNormal.y > 0.5) {
-      world.y += sin(world.x * 0.9 + uTime * 1.7) * 0.04 + cos(world.z * 0.8 + uTime * 1.3) * 0.04 - 0.04;
+    mat4 m = modelMatrix;
+    #ifdef USE_INSTANCING
+      m = modelMatrix * instanceMatrix;
+    #endif
+    vec4 world = m * vec4(position, 1.0);
+    #ifdef USE_INSTANCING
+      // leaves sway gently in the wind
+      float s = aSway * max(position.y - 1.5, 0.0) * 0.02;
+      world.x += sin(uTime * 1.3 + world.z * 0.3) * s;
+      world.z += cos(uTime * 1.1 + world.x * 0.3) * s;
+    #endif
+    if (uIsLiquid > 0.5) {
+      world.y += sin(world.x * 0.7 + uTime * 1.6) * 0.05 + cos(world.z * 0.6 + uTime * 1.2) * 0.05 - 0.05;
     }
+    vNormal = normalize(mat3(m) * aNormal);
     vWorld = world.xyz;
+    vTiles = aTiles;
+    vLight = vec3(aLight.x / 255.0, aLight.yz / 15.0);
     vec4 mv = viewMatrix * world;
     vFogDepth = length(mv.xyz);
     gl_Position = projectionMatrix * mv;
@@ -55,34 +66,42 @@ const frag = /* glsl */`
   uniform float uTime;
   uniform vec3 uSunDir, uSunColor, uAmbient, uSkyColor, uGroundColor, uFogColor, uBlockLightColor;
   uniform float uDaylight, uFogNear, uFogFar, uIsLiquid;
-  varying vec2 vUv;
-  varying float vTile;
-  varying float vAo;
-  varying vec2 vLight;
   varying vec3 vNormal;
-  varying float vFogDepth;
   varying vec3 vWorld;
+  varying vec2 vTiles;
+  varying vec3 vLight;
+  varying float vFogDepth;
   const float TILES = ${ATLAS_TILES.toFixed(1)};
+
+  vec4 tileSample(float tile, vec2 uv) {
+    float t = floor(tile + 0.5);
+    vec2 f = clamp(fract(uv), 0.002, 0.998);
+    vec2 xy = vec2(mod(t, TILES), floor(t / TILES));
+    return texture2D(uAtlas, (xy + f) / TILES);
+  }
+
   void main() {
-    vec2 f = clamp(fract(vUv), 0.001, 0.999);
-    if (uIsLiquid > 0.5) f = fract(f + vec2(uTime * 0.03, uTime * 0.05) * (vNormal.y > 0.5 ? 1.0 : 0.0));
-    float t = floor(vTile + 0.5);
-    vec2 tileXY = vec2(mod(t, TILES), floor(t / TILES));
-    vec4 tex = texture2D(uAtlas, (tileXY + f) / TILES);
-    if (uIsLiquid < 0.5 && tex.a < 0.5) discard;
     vec3 n = normalize(vNormal);
-    float ao = vAo < 0.5 ? 0.42 : vAo < 1.5 ? 0.62 : vAo < 2.5 ? 0.82 : 1.0;
-    float sky = pow(vLight.x, 1.6);
-    float blk = pow(vLight.y, 1.5);
+    vec4 tex;
+    if (uIsLiquid > 0.5) {
+      tex = tileSample(vTiles.x, vWorld.xz + vec2(uTime * 0.03, uTime * 0.05));
+    } else {
+      // tri-planar: top tile on flat ground, side tile on steep slopes
+      float topW = n.y > 0.0 ? smoothstep(0.55, 0.75, n.y) : 0.0;
+      vec2 sideUv = abs(n.x) > abs(n.z) ? vWorld.zy : vWorld.xy;
+      if (topW > 0.99) tex = tileSample(vTiles.x, vWorld.xz);
+      else if (topW < 0.01) tex = tileSample(vTiles.y, sideUv);
+      else tex = mix(tileSample(vTiles.y, sideUv), tileSample(vTiles.x, vWorld.xz), topW);
+    }
+    float ao = vLight.x;
+    float sky = pow(vLight.y, 1.6);
+    float blk = pow(vLight.z, 1.5);
     float hemi = n.y * 0.5 + 0.5;
-    vec3 skyLit = uAmbient * 1.3 + mix(uGroundColor, uSkyColor, hemi) * 0.25 + uSunColor * max(dot(n, uSunDir), 0.0) * 0.35;
-    // side faces get a fixed shade for the classic voxel look
-    float faceShade = abs(n.x) > 0.5 ? 0.9 : abs(n.z) > 0.5 ? 0.8 : n.y < -0.5 ? 0.6 : 1.0;
+    vec3 skyLit = uAmbient * 1.3 + mix(uGroundColor, uSkyColor, hemi) * 0.25 + uSunColor * max(dot(n, uSunDir), 0.0) * 0.4;
     vec3 lit = skyLit * sky + uBlockLightColor * blk * 1.15;
     lit = max(lit, vec3(0.035, 0.035, 0.05));
-    vec3 col = tex.rgb * lit * ao * faceShade;
-    // lava glows on its own
-    if (abs(t - ${TILE_INDEX.lava.toFixed(1)}) < 0.5) col = tex.rgb * 1.1;
+    vec3 col = tex.rgb * lit * ao;
+    if (abs(floor(vTiles.x + 0.5) - ${TILE_INDEX.lava.toFixed(1)}) < 0.5) col = tex.rgb * 1.1; // lava glows
     float fog = smoothstep(uFogNear, uFogFar, vFogDepth);
     col = mix(col, uFogColor, fog);
     float alpha = uIsLiquid > 0.5 ? mix(tex.a, 1.0, fog) : 1.0;
@@ -90,9 +109,9 @@ const frag = /* glsl */`
   }
 `;
 
-export function createVoxelMaterials(atlas: THREE.Texture) {
+export function createWorldMaterials(atlas: THREE.Texture) {
   worldUniforms.uAtlas.value = atlas;
-  const opaque = new THREE.ShaderMaterial({
+  const terrain = new THREE.ShaderMaterial({
     uniforms: { ...worldUniforms, uIsLiquid: { value: 0 } },
     vertexShader: vert, fragmentShader: frag
   });
@@ -101,5 +120,5 @@ export function createVoxelMaterials(atlas: THREE.Texture) {
     vertexShader: vert, fragmentShader: frag,
     transparent: true, depthWrite: false, side: THREE.DoubleSide
   });
-  return { opaque, liquid };
+  return { terrain, liquid };
 }
