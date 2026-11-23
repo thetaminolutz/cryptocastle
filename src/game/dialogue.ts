@@ -20,6 +20,8 @@ export interface DialogueHooks {
   toast(t: string, c?: string): void;
   onOpen(): void; onClose(): void;
   priceMul(): number;
+  /** story / quest options for a villager */
+  extraOptions(n: NPC): [string, () => void][];
 }
 
 const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
@@ -146,6 +148,7 @@ export class Dialogue {
     else if (JOB_NEEDS[n.job]) opts.push(['Any work for me?', () => this.work()]);
     opts.push(['Heard any rumours?', () => this.rumour()]);
     opts.push(['I have a gift for you', () => this.gifts()]);
+    for (const o of this.hooks.extraOptions(n)) opts.push(o);
     if (n.job === 'innkeeper') opts.push([`Rent a room (8 gold)`, () => this.rent()]);
     opts.push(['More…', () => this.more()]);
     opts.push(['Farewell', () => this.close()]);

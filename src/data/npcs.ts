@@ -14,7 +14,7 @@ export const DISLIKED_BY_ALL = ['toad_slime', 'ectoplasm', 'bone'];
 
 export const JOB_TITLE: Record<Job, string> = {
   farmer: 'Farmer', blacksmith: 'Blacksmith', guard: 'Guard', merchant: 'Merchant', alchemist: 'Alchemist', tailor: 'Tailor',
-  priest: 'Priest', child: 'Child', innkeeper: 'Innkeeper', hunter: 'Hunter', beggar: 'Beggar', villager: 'Villager'
+  priest: 'Priest', child: 'Child', innkeeper: 'Innkeeper', hunter: 'Hunter', beggar: 'Beggar', villager: 'Villager', banker: 'Banker', arena_master: 'Arena Master'
 };
 
 /** What each job asks for when you look for work: item, amount range, reward per item (gold). */

@@ -40,7 +40,11 @@ import type { AABB } from '../world/building';
 import { Story, StorySave } from './story';
 import { openCreation } from '../ui/creation';
 import { applyProfile, Traits } from './profile';
-import { TOWER } from '../data/story';
+import { TOWER, GRAVEYARD } from '../data/story';
+import { QuestLog, QuestSave } from './quests';
+import { Chapters, ChapterSave } from './chapters';
+import { WorldMap, MapSave, MapMarker } from '../ui/map';
+import { renderJournal } from '../ui/journal';
 
 const SPAWN = { x: 0.5, z: 0.5 };
 
@@ -98,6 +102,11 @@ export class Game {
   private hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
   private fog = new THREE.Fog(0x000000, 40, 96);
   readonly story: Story;
+  readonly quests: QuestLog;
+  readonly chapters: Chapters;
+  readonly map: WorldMap;
+  private travelMode = false;
+  private questTimer = 0;
   traits!: Traits;
   private creating = false;
 
@@ -139,14 +148,18 @@ export class Game {
       save: () => this.save(),
       exportSave: async () => { await this.save(); saves.exportFile(this.buildSave()); },
       quit: () => { location.href = location.pathname; },
-      onClose: () => this.setPaused(false)
+      onClose: () => { this.travelMode = false; this.setPaused(false); },
+      renderMap: (host) => this.map.render(host, () => this.mapMarkers(), {
+        travel: this.travelMode ? (id, label) => this.travel(id, label) : undefined
+      }),
+      renderJournal: (host) => renderJournal(host, this.quests, () => {})
     });
     this.interaction = new Interaction(this.world, this.player, this.model, this.inventory, this.props, this.building, {
       setAction: (l) => { this.touch.setVisible('interact', !!l && !this.build.active); if (l) this.touch.setLabel('interact', l); },
       setAttack: (l) => this.touch.setLabel('attack', l),
       toast: (t, c) => this.hotbar.notify(t, c),
       openCrafting: () => { this.setPaused(true); this.menu.open('crafting'); },
-      special: (p) => this.story.useSpecial(p),
+      special: (p) => { if (!this.chapters.special(p)) this.story.useSpecial(p); },
       openChest: (p) => { if (p.gen) { this.hotbar.notify('This chest belongs to someone else.', '#e08070'); return; } if (p.items) { this.setPaused(true); this.menu.openChest(p.items); } },
       sleep: (p) => {
         if (p.gen && !(this.rentedBed && Math.hypot(this.rentedBed.x - p.x, this.rentedBed.z - p.z) < 1.5)) { this.hotbar.notify('This bed is not yours. Rent a room from the innkeeper.', '#e08070'); return; }
@@ -185,9 +198,11 @@ export class Game {
       toast: (t, c) => this.hotbar.notify(t, c),
       onOpen: () => { this.touch.setVisible('interact', false); },
       onClose: () => {},
-      priceMul: () => this.traits?.priceMul ?? 1
+      priceMul: () => this.traits?.priceMul ?? 1,
+      extraOptions: (n) => this.chapters.dialogueOptions(n, () => this.dialogue.close())
     });
     this.villagers.onEnterVillage = (v) => {
+      this.map.places.add(`${v.site.name}@${Math.round(v.site.x)},${Math.round(v.site.z)}`);
       this.hud.showRegion(v.site.name, `Village · ${Math.round(this.villagers.villageRep(v.site.id)) >= 25 ? 'You are welcome here' : 'Strangers are watched here'}`);
       void this.save();
     };
@@ -205,6 +220,24 @@ export class Game {
         this.hotbar.notify(lost ? 'You recover what you can carry.' : 'You recover your belongings.', '#e8d8a8');
       } };
     };
+    this.map = new WorldMap(this.gen);
+    this.quests = new QuestLog(this.inventory, {
+      place: (p) => this.chapters.place(p),
+      reward: (g, xp) => { this.gold += g; if (xp) this.combat.gainXp(xp); },
+      toast: (t, c) => this.hotbar.notify(t, c),
+      day: () => this.sky.day,
+      onStage: () => {},
+      onComplete: () => { void this.save(); }
+    });
+    this.chapters = new Chapters(ui, this.gen, this.world, this.building, this.player, this.creatures, this.quests, this.map, {
+      toast: (t, c) => this.hotbar.notify(t, c),
+      gold: () => this.gold, addGold: (n) => { this.gold += n; },
+      give: (id, n) => { const left = this.inventory.add(id, n); if (left) this.hotbar.notify('Your pack is full.', '#e08070'); },
+      openStash: (items) => { this.setPaused(true); this.menu.openChest(items); },
+      openTravelMap: () => { this.travelMode = true; this.setPaused(true); this.menu.open('map'); },
+      pause: (p) => this.setPaused(p)
+    });
+    this.creatures.onDeath = (c) => this.quests.onKill(c.def.id, c.pos);
     this.story = new Story(ui, this.world, this.building, this.player, this.creatures, this.props, {
       toast: (t, c) => this.hotbar.notify(t, c),
       objective: (t, at) => this.hud.setObjective(t, at, this.player.pos, this.rig.yaw),
@@ -219,7 +252,8 @@ export class Game {
           close: () => { this.creating = false; this.rig.distance = 4.4; this.applyProfile(); }
         }, () => { done(); void this.save(); });
       },
-      reveal: () => this.reveal()
+      reveal: () => this.reveal(),
+      flag: (f) => this.quests.flag(f)
     });
     this.scene.add(this.story.group);
     this.touch.onTap = (x, y) => {
@@ -245,9 +279,17 @@ export class Game {
       this.villagers.saved = d.villagers ?? {};
       this.dialogue.shops = d.shops ?? {};
       this.story.load(d.story as StorySave | undefined);
+      this.quests.load(d.quests as QuestSave | undefined);
+      this.map.load(d.map as MapSave | undefined);
+      this.chapters.load(d.chapters as ChapterSave | undefined);
+      if (!d.quests) { // saves from before the quest log
+        this.quests.start('ch1', true);
+        if (this.story.step === 'free') for (const f of ['met_stranger', 'met_herald', 'rite_done']) this.quests.flag(f);
+      }
     } else {
       this.inventory.add('staff', 1);
       this.story.begin();
+      this.quests.start('ch1', true);
     }
     this.model.setLook(this.story.profile.created ? this.story.profile.look : null);
     this.applyProfile();
@@ -294,7 +336,10 @@ export class Game {
       lostPack: this.lostPack,
       villagers: this.villagers.serialize(),
       shops: this.dialogue.shops,
-      story: this.story.serialize()
+      story: this.story.serialize(),
+      quests: this.quests.serialize(),
+      map: this.map.serialize(),
+      chapters: this.chapters.serialize()
     };
   }
 
@@ -319,6 +364,7 @@ export class Game {
   private die(cause: string) {
     if (this.dying) return;
     this.dying = true;
+    this.chapters.onPlayerDeath();
     this.combat.status.clear();
     this.combat.lock = null;
     if (this.start0.mode === 'onelife') {
@@ -341,6 +387,40 @@ export class Game {
     setTimeout(() => showDeath('YOU HAVE FALLEN', `You died of ${cause}.${lostGold ? ` ${lostGold} gold slipped from your purse.` : ''}${items.length ? ' Your pack lies where you fell — go back for it.' : ''}`, 'Wake', () => {
       this.respawn(); this.dying = false; void this.save();
     }), 1200);
+  }
+
+  /** Markers for the world map. */
+  private mapMarkers(): MapMarker[] {
+    const p = this.player.pos;
+    const out: MapMarker[] = [{ x: p.x, z: p.z, kind: 'player', yaw: this.player.yaw }];
+    const home = this.building.respawn;
+    if (home) out.push({ x: home.x, z: home.z, kind: 'home', label: 'Home' });
+    out.push({ x: TOWER.x, z: TOWER.z, kind: 'landmark', label: 'The Tower' });
+    const parse = (s: string) => { const [name, xz] = s.split('@'); const [x, z] = xz.split(',').map(Number); return { name, x, z }; };
+    for (const s of this.map.places) { const q = parse(s); out.push({ x: q.x, z: q.z, kind: q.name === 'The Pale Citadel' ? 'citadel' : 'village', label: q.name }); }
+    if (this.quests.get('ch2')) out.push({ x: GRAVEYARD.x, z: GRAVEYARD.z, kind: 'landmark', label: 'Barrow Cemetery' });
+    if (this.quests.get('ch3')) { const e = this.chapters.labEntrance; out.push({ x: e.x, z: e.z, kind: 'landmark', label: 'Labyrinth' }); out.push({ x: this.chapters.citadel.x, z: this.chapters.citadel.z, kind: 'citadel', label: 'The Pale Citadel' }); }
+    for (const w of this.map.waystones) { const q = parse(w); out.push({ x: q.x, z: q.z, kind: 'waystone', label: q.name, id: w }); }
+    for (const [x, z] of this.map.pins) out.push({ x, z, kind: 'pin' });
+    if (this.lostPack) out.push({ x: this.lostPack.x, z: this.lostPack.z, kind: 'pack', label: 'Your pack' });
+    const o = this.quests.trackedObjective();
+    if (o?.at) out.push({ x: o.at.x, z: o.at.z, kind: 'quest', label: o.text });
+    return out;
+  }
+
+  /** Fast travel to a discovered waystone. */
+  private travel(id: string, label: string) {
+    const [, xz] = id.split('@'); const [x, z] = xz.split(',').map(Number);
+    if (Math.hypot(x - this.player.pos.x, z - this.player.pos.z) < 20) { this.hotbar.notify('You are already here.', '#a8987c'); return; }
+    if (this.gold < 10) { this.hotbar.notify('Travel costs 10 gold.', '#e08070'); return; }
+    this.gold -= 10;
+    this.menu.close();
+    this.travelMode = false;
+    const tx = x + 1.5, tz = z + 1.5;
+    this.spawnAt = { x: tx, y: this.gen.column(Math.floor(tx), Math.floor(tz)).height + 0.5, z: tz, yaw: this.player.yaw };
+    this.player.pos.set(tx, this.spawnAt.y, tz);
+    this.spawned = false;
+    this.hotbar.notify(`The waystone hums. You step out at ${label}.`, '#80c0ff');
   }
 
   /** Re-derive stats and perks from the character profile. */
@@ -459,6 +539,17 @@ export class Game {
       this.villagers.update(dt, this.player.pos, this.sky.hours, cam);
       this.villagers.tickDoors(dt);
       this.story.update(dt, this.elapsed);
+      this.chapters.update(dt);
+      this.questTimer -= dt;
+      if (this.questTimer <= 0) {
+        this.questTimer = 0.5;
+        this.quests.update(this.player.pos);
+        this.map.reveal(this.player.pos.x, this.player.pos.z, 56);
+      }
+      if (this.story.step === 'free') {
+        const o = this.quests.trackedObjective();
+        this.hud.setObjective(o?.text ?? null, o?.at ?? null, this.player.pos, this.rig.yaw);
+      }
       if (this.dialogue.isOpen && this.player.speed > 1) this.dialogue.close();
       this.model.blocking = this.player.blocking;
       const sh = [0, 1, 2, 3, 4, 5].map((i) => this.inventory.slots[i]).find((x) => x && ITEMS[x.id].shield);

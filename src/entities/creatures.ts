@@ -73,6 +73,8 @@ export class Creatures {
   /** kills per enemy id (bestiary) */
   kills: Record<string, number> = {};
   enabled = true;
+  /** called once when a creature dies (quests, arena) */
+  onDeath: ((c: Creature) => void) | null = null;
 
   constructor(private world: World, private gen: TerrainGen, private building: Building, shadows: ShadowSystem, public hooks: CreatureHooks) {
     for (const def of Object.values(ENEMIES)) {
@@ -266,6 +268,7 @@ export class Creatures {
     if (c.hp <= 0) {
       c.hp = 0; c.state = 'dead'; c.deadT = 0; c.flash = 1;
       this.kills[c.def.id] = (this.kills[c.def.id] ?? 0) + 1;
+      this.onDeath?.(c);
     }
     return dealt;
   }

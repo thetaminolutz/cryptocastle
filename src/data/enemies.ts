@@ -144,6 +144,35 @@ function imp(b: GeoBuilder) {
   const tail = new THREE.CylinderGeometry(0.01, 0.03, 0.35, 5); tail.rotateX(1.2); tail.translate(0, -0.18, 0.18); add(b, tail, skin, 6, V(0, -0.1, 0.08));
 }
 
+function scorpion(b: GeoBuilder) {
+  const shell: C3 = [0.42, 0.26, 0.14], dark: C3 = [0.22, 0.13, 0.07];
+  add(b, ell(0.32, 0.16, 0.5, 0, 0.32, 0), shell, 0, V(), 'red_rock');
+  add(b, ell(0.22, 0.12, 0.2, 0, 0.34, -0.5), shell, 5, V(0, 0.32, -0.35), 'red_rock');
+  eyes(b, 0.06, 0.44, -0.62, 0.025, [0.1, 0.9, 0.5], 1.2);
+  // pincers on the "arms"
+  for (const [sd, bone] of [[-1, 1], [1, 9]] as const) {
+    const piv = V(sd * 0.22, 0.34, -0.5);
+    add(b, cap(0.05, 0.4, sd * 0.38, 0.4, -0.72), shell, bone, piv, 'red_rock');
+    add(b, ell(0.12, 0.08, 0.2, sd * 0.42, 0.36, -0.98), dark, bone, piv, 'red_rock');
+    const claw = new THREE.ConeGeometry(0.05, 0.25, 5); claw.rotateX(-Math.PI / 2); claw.translate(sd * 0.47, 0.36, -1.18); add(b, claw, dark, bone, piv);
+  }
+  // legs: 4 per side on the 4 leg bones
+  for (let k = 0; k < 4; k++) for (const sd of [-1, 1]) {
+    const bone = k < 2 ? (sd < 0 ? 1 : 2) : (sd < 0 ? 3 : 4);
+    const z = -0.3 + k * 0.22;
+    const leg = new THREE.CylinderGeometry(0.025, 0.02, 0.6, 5); leg.rotateZ(sd * 1.0); leg.translate(sd * 0.48, 0.22, z);
+    add(b, leg, dark, bone, V(sd * 0.25, 0.32, z));
+  }
+  // the tail: segments arching over the back, stinger on top
+  const segs = 6;
+  for (let i = 0; i < segs; i++) {
+    const t = i / (segs - 1), a = t * Math.PI * 0.95;
+    const y = 0.38 + Math.sin(a) * 0.75, z = 0.45 + Math.cos(a) * -0.1 + Math.sin(a * 0.5) * 0.45 - t * 0.35;
+    add(b, ell(0.11 - t * 0.04, 0.09 - t * 0.03, 0.13, 0, y, z), i % 2 ? shell : dark, 6, V(0, 0.38, 0.45), 'red_rock');
+  }
+  const sting = new THREE.ConeGeometry(0.04, 0.26, 6); sting.rotateX(-2.2); sting.translate(0, 1.08, -0.02); add(b, sting, [0.85, 0.8, 0.5], 6, V(0, 0.38, 0.45), 'white', 0.2);
+}
+
 export const ENEMIES: Record<string, EnemyDef> = {};
 const E = (d: EnemyDef) => { ENEMIES[d.id] = d; };
 
@@ -191,3 +220,14 @@ E({ id: 'fire_imp', name: 'Fire Imp', desc: 'Cackling sparks with teeth. Water a
   hp: 30, dmg: 8, dmgType: 'fire', speed: 3.0, run: 6.5, reach: 1.5, cooldown: 1.2, windup: 0.35, radius: 0.35, height: 0.9,
   weak: { ice: 2, fire: 0, pierce: 1.2 }, onHit: ['burn', 0.5], loot: [['ember_core', 1, 1, 0.7], ['coal', 1, 2, 0.6]], gold: [1, 6], xp: 18,
   biomes: [Biome.VolcanicAshlands], group: [2, 4], flying: true, build: imp });
+
+// ---- story enemies (never spawn naturally: no biomes)
+E({ id: 'scorpion', name: 'Giant Scorpion', desc: 'The labyrinth’s keepers. Pincers hold, the tail strikes — and the venom burns for a long time.',
+  hp: 48, dmg: 10, dmgType: 'pierce', speed: 2.3, run: 5.4, reach: 1.7, cooldown: 1.5, windup: 0.5, radius: 0.6, height: 0.9,
+  weak: { blunt: 1.4, ice: 1.3, pierce: 0.8 }, onHit: ['poison', 0.45], loot: [['chitin', 1, 3, 0.9], ['venom_sac', 1, 1, 0.5]], gold: [0, 3], xp: 22,
+  biomes: [], group: [1, 2], build: scorpion });
+E({ id: 'champion', name: 'Arena Champion', desc: 'Trained for the crowd, scarred by it. Reads your swings and punishes greed.',
+  hp: 130, dmg: 15, dmgType: 'slash', speed: 2.7, run: 5.8, reach: 2.0, cooldown: 1.1, windup: 0.45, radius: 0.45, height: 1.9,
+  weak: {}, loot: [['bandage', 1, 2, 1]], gold: [10, 20], xp: 60,
+  biomes: [], group: [1, 1],
+  build: (b) => humanoid(b, { h: 1.9, w: 1.15, skin: [0.72, 0.55, 0.42], cloth: [0.62, 0.62, 0.66], pants: [0.35, 0.12, 0.1], eye: [0.1, 0.1, 0.1], layer: 'white', weapon: 'sword' }) });

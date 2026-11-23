@@ -9,8 +9,8 @@ import { Simplex, hash3 } from './noise';
 import { B } from './blocks';
 import { CHUNK_HEIGHT, CHUNK_SIZE, SEA_LEVEL } from './constants';
 import { Biome, BIOMES, CLIMATE_BIOMES, Plant } from './biomes';
-import { villageAt, flattenWeight, isVillageHeightOk, VillageSite } from './villages';
-import { SPRING, GORGE, TOWER, CAMPFIRE } from '../data/story';
+import { villageAt, flattenWeight, isVillageHeightOk, VillageSite, citadelSite, labyrinthOf, labyrinthDist, Labyrinth } from './villages';
+import { SPRING, GORGE, TOWER, CAMPFIRE, GRAVEYARD, CITADEL_HALF, LAB } from '../data/story';
 
 export const PAD = CHUNK_SIZE + 2;           // padded width (18): grid points -1..16
 export const PAD_LAYER = PAD * PAD;
@@ -126,6 +126,14 @@ export class TerrainGen {
     // a small glade around the Ashen Stranger's campfire (no trees, so the light shows)
     const cd = Math.hypot(x - CAMPFIRE.x, z - CAMPFIRE.z);
     if (cd < 9) c.village = Math.max(c.village, Math.min(1, (9 - cd) / 3) * 0.6);
+    // the old barrow cemetery (chapter 2) on level ground
+    const gd = Math.hypot(x - GRAVEYARD.x, z - GRAVEYARD.z);
+    if (gd < 26) {
+      if (this.graveH === null) this.graveH = Math.max(SEA_LEVEL + 3, this.rawColumn(GRAVEYARD.x, GRAVEYARD.z).height);
+      const w = Math.max(0, Math.min(1, (26 - gd) / 10));
+      c.height = c.height * (1 - w) + this.graveH * w;
+      c.village = Math.max(c.village, w * 0.7);
+    }
     const v = this.village(x, z);
     if (v) {
       const w = flattenWeight(v, x, z);
@@ -147,6 +155,12 @@ export class TerrainGen {
   village(x: number, z: number): VillageSite | null { return villageAt(x, z, this.seed, this.rawFn); }
 
   private towerH: number | null = null;
+  private graveH: number | null = null;
+  private lab: Labyrinth | null = null;
+  /** The Pale Citadel's site (fixed per seed). */
+  citadel(): VillageSite { return citadelSite(this.seed, this.rawFn); }
+  /** The scorpion labyrinth beneath the citadel. */
+  labyrinth(): Labyrinth { return this.lab ?? (this.lab = labyrinthOf(this.citadel())); }
   private rawColumn(x: number, z: number): Column {
     const n = this.n;
     const d2 = (x * x + z * z) / (260 * 260);
@@ -243,6 +257,12 @@ export class TerrainGen {
     const entrance = smooth(0.5, 0.72, n[22].fbm2(wx / 260, wz / 260, 2)) * awayFromStart;
     const crystal = col.crystal;
 
+    // the scorpion labyrinth beneath the Pale Citadel
+    const L = this.labyrinth();
+    const half = (L.n * LAB.cell) / 2;
+    const inLab = Math.abs(wx - L.cx) < half + 8 && wz > L.cz - half - 8 && wz < L.cz + half + 64;
+    const inCit = Math.abs(wx - L.cx) < CITADEL_HALF && Math.abs(wz - L.cz) < CITADEL_HALF;
+    if (inCit && !steep) top = B.GRAVEL;
     const yMax = Math.min(CHUNK_HEIGHT - 1, Math.ceil(Math.max(h, col.liquidLevel)) + 6 + (col.floating > 0.2 ? 50 : 0));
     let localDepth = -1; // metres below the nearest surface above (handles islands/overhangs)
     for (let y = yMax; y >= 0; y--) {
@@ -257,6 +277,10 @@ export class TerrainGen {
         const protect = Math.max(0, 7 - d) * 1.5 * (1 - entrance);
         const cave = (a * a + c * c - r) * 140 + protect;
         if (cave < d) d = cave;
+      }
+      if (inLab && y > L.floor - 3) {
+        const ld = labyrinthDist(L, wx, y, wz);
+        if (ld < d) d = ld;
       }
       if (ravine > 0 && y > h - ravine) {
         const half = 2.5 + (y - (h - ravine)) * (canyon ? 0.5 : 0.22);

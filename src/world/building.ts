@@ -52,7 +52,88 @@ function wallFrame(b: GeoBuilder, mat: 'wood' | 'stone' | 'brick', h = WALL_H) {
   }
 }
 
+const PALE: C3 = [1.45, 1.42, 1.34];
 const MODELS: Record<string, () => THREE.BufferGeometry> = {
+  marble_wall: () => { const b = new GeoBuilder(); box(b, 2, WALL_H, 0.6, 0, WALL_H / 2, 0, 'stone_brick', PALE, 0, [1, WALL_H / 2]); return b.build(); },
+  marble_half: () => { const b = new GeoBuilder(); box(b, 2.05, 1.1, 0.5, 0, 0.55, 0, 'stone_brick', PALE, 0, [1, 0.55]); box(b, 2.15, 0.2, 0.62, 0, 1.2, 0, 'stone', PALE); return b.build(); },
+  crenel: () => {
+    const b = new GeoBuilder();
+    box(b, 2, 0.25, 0.7, 0, 0.12, 0, 'stone', PALE);
+    box(b, 0.8, 0.7, 0.6, -0.5, 0.6, 0, 'stone_brick', PALE, 0, [0.4, 0.35]);
+    return b.build();
+  },
+  wall_tower: () => {
+    const b = new GeoBuilder();
+    const t = new THREE.CylinderGeometry(2.1, 2.3, 9.4, 14); t.translate(0, 4.7, 0); b.add(t, { layer: 'stone_brick', color: PALE, uvScale: [6, 4.7] });
+    const r = new THREE.CylinderGeometry(2.45, 2.45, 0.5, 14); r.translate(0, 9.6, 0); b.add(r, { layer: 'stone', color: PALE });
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; box(b, 0.7, 0.7, 0.5, Math.sin(a) * 2.2, 10.2, Math.cos(a) * 2.2, 'stone_brick', PALE); }
+    const roof = new THREE.ConeGeometry(2.0, 3.2, 14); roof.translate(0, 11.8, 0); b.add(roof, { layer: 'shingles', color: [0.55, 0.32, 0.3], uvScale: [4, 2] });
+    flame(b, 0, 9.9, -2.45, 1.4);
+    return b.build();
+  },
+  citadel_gate: () => {
+    const b = new GeoBuilder();
+    box(b, 8, 5.4, 0.4, 0, 2.7, 0, 'planks', [0.5, 0.4, 0.33], 0, [4, 2.7]);
+    for (let i = -3; i <= 3; i++) box(b, 0.12, 5.4, 0.12, i * 1.1, 2.7, -0.25, 'ore_iron', [0.45, 0.45, 0.5]);
+    for (const y of [1.2, 2.8, 4.4]) box(b, 8, 0.18, 0.12, 0, y, -0.26, 'ore_iron', [0.45, 0.45, 0.5]);
+    box(b, 9, 1.0, 1.0, 0, 5.9, 0, 'stone_brick', PALE, 0, [4.5, 0.5]);
+    for (const s of [-1, 1]) box(b, 1.0, 5.4, 1.0, s * 4.5, 2.7, 0, 'stone_brick', PALE, 0, [0.5, 2.7]);
+    return b.build();
+  },
+  lab_arch: () => {
+    const b = new GeoBuilder();
+    box(b, 5.6, 0.8, 1.2, 0, 3.6, 0, 'stone_brick', PALE, 0, [2.8, 0.4]);
+    for (const s of [-1, 1]) box(b, 0.8, 3.2, 1.2, s * 2.4, 1.6, 0, 'stone_brick', PALE, 0, [0.4, 1.6]);
+    // a carved scorpion over the arch
+    box(b, 1.2, 0.3, 0.1, 0, 3.6, -0.62, 'white', [0.25, 0.2, 0.15]);
+    const tail = new THREE.TorusGeometry(0.35, 0.06, 6, 10, Math.PI * 1.3); tail.translate(0.5, 3.85, -0.62); b.add(tail, { layer: 'white', color: [0.25, 0.2, 0.15] });
+    return b.build();
+  },
+  quest_board: () => {
+    const b = new GeoBuilder();
+    log(b, -0.9, 0, 0, 2.2, 0.07); log(b, 0.9, 0, 0, 2.2, 0.07);
+    box(b, 1.9, 1.1, 0.08, 0, 1.45, 0, 'planks', DARK_WOOD, 0, [1, 0.55]);
+    const roof = new THREE.BoxGeometry(2.2, 0.08, 0.6); roof.rotateX(0.35); roof.translate(0, 2.2, 0); b.add(roof, { layer: 'shingles', uvScale: [1, 0.3] });
+    const notes: [number, number, number][] = [[-0.55, 1.6, 0.1], [0.05, 1.7, -0.08], [0.6, 1.5, 0.05], [-0.3, 1.2, -0.1], [0.4, 1.15, 0.12]];
+    for (const [x, y, a] of notes) { const n = new THREE.PlaneGeometry(0.42, 0.5); n.rotateZ(a); n.rotateY(Math.PI); n.translate(x, y, -0.05); b.add(n, { layer: 'white', color: [0.85, 0.78, 0.6] }); }
+    return b.build();
+  },
+  waystone: () => {
+    const b = new GeoBuilder();
+    const g = new THREE.CylinderGeometry(0.22, 0.38, 2.0, 5); g.translate(0, 1.0, 0); b.add(g, { layer: 'stone', color: [0.6, 0.62, 0.7] });
+    for (let i = 0; i < 4; i++) box(b, 0.05, 0.25, 0.02, 0, 0.6 + i * 0.32, -0.33 + i * 0.03, 'white', [0.4, 0.75, 1.4], 2.2);
+    const base = new THREE.CylinderGeometry(0.6, 0.7, 0.2, 8); base.translate(0, 0.1, 0); b.add(base, { layer: 'cobble', color: [0.8, 0.8, 0.85] });
+    return b.build();
+  },
+  stash: () => {
+    const b = new GeoBuilder();
+    box(b, 1.2, 1.2, 0.8, 0, 0.6, 0, 'ore_iron', [0.5, 0.5, 0.55], 0, [0.6, 0.6]);
+    const dial = new THREE.CylinderGeometry(0.22, 0.22, 0.06, 12); dial.rotateX(Math.PI / 2); dial.translate(0, 0.7, -0.42); b.add(dial, { layer: 'white', color: [0.75, 0.6, 0.25] });
+    return b.build();
+  },
+  gravestone: () => {
+    const b = new GeoBuilder();
+    box(b, 0.6, 0.7, 0.16, 0, 0.35, 0, 'stone', [0.7, 0.7, 0.72]);
+    const top = new THREE.CylinderGeometry(0.3, 0.3, 0.16, 10, 1, false, -Math.PI / 2, Math.PI); top.rotateX(Math.PI / 2); top.translate(0, 0.7, 0); b.add(top, { layer: 'stone', color: [0.7, 0.7, 0.72] });
+    box(b, 0.3, 0.03, 0.01, 0, 0.62, -0.085, 'white', [0.15, 0.15, 0.15]); box(b, 0.03, 0.3, 0.01, 0, 0.55, -0.085, 'white', [0.15, 0.15, 0.15]);
+    return b.build();
+  },
+  grave_pit: () => {
+    const b = new GeoBuilder();
+    box(b, 0.9, 0.04, 1.9, 0, 0.0, 0, 'white', [0.02, 0.015, 0.01]);
+    for (const s of [-1, 1]) { const m = new THREE.SphereGeometry(0.5, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); m.scale(0.6, 0.5, 2); m.translate(s * 0.9, 0, 0); b.add(m, { layer: 'dirt' }); }
+    return b.build();
+  },
+  hoard_chest: () => {
+    const b = new GeoBuilder();
+    box(b, 1.0, 0.45, 0.66, 0, 0.22, 0, 'planks', [0.45, 0.33, 0.25]);
+    const lid = new THREE.CylinderGeometry(0.33, 0.33, 1.0, 10, 1, false, 0, Math.PI); lid.rotateZ(Math.PI / 2); lid.rotateX(Math.PI / 2); lid.scale(1, 0.5, 1); lid.translate(0, 0.45, 0);
+    b.add(lid, { layer: 'planks', color: [0.45, 0.33, 0.25] });
+    for (const x of [-0.36, 0.36]) box(b, 0.07, 0.5, 0.68, x, 0.25, 0, 'ore_gold', [1, 0.85, 0.5]);
+    for (let i = 0; i < 6; i++) { const c = new THREE.CylinderGeometry(0.06, 0.06, 0.02, 8); c.translate(0.6 + (i % 3) * 0.1, 0.01 + Math.floor(i / 3) * 0.02, -0.2 + i * 0.07); b.add(c, { layer: 'white', color: [1.2, 0.95, 0.4], glow: 0.3 }); }
+    return b.build();
+  },
+
   floor: () => { const b = new GeoBuilder(); box(b, 2, 0.2, 2, 0, -0.1, 0, 'planks', [1, 1, 1], 0, [1, 1]); return b.build(); },
   stone_floor: () => { const b = new GeoBuilder(); box(b, 2, 0.25, 2, 0, -0.125, 0, 'cobble', [1, 1, 1], 0, [1, 1]); return b.build(); },
   wall: () => { const b = new GeoBuilder(); wallFrame(b, 'wood'); return b.build(); },

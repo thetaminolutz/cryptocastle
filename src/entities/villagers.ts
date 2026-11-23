@@ -152,6 +152,8 @@ export class Villagers {
     }
     const s0 = siteForCell(0, 0, this.gen.seed, () => ({ height: 0, ok: false }));
     if (s0 && !seen.has(s0.id)) out.push(s0);
+    const cit = this.gen.citadel();
+    if (!seen.has(cit.id)) out.push(cit);
     return out;
   }
 
@@ -238,7 +240,12 @@ export class Villagers {
     for (const j of jobs) {
       const home = j.job === 'innkeeper' || j.job === 'priest' ? j.at! : homes[hi++ % Math.max(1, homes.length)] ?? v.layout.buildings[0];
       const bed = home.beds[0] ?? home.inside;
-      out.push(make(j.job, home, bed, pick(SURNAMES), j.at));
+      const p = make(j.job, home, bed, pick(SURNAMES), j.at);
+      if (j.at?.npc) {
+        p.name = j.at.npc;
+        if (j.at.female !== undefined) { p.female = j.at.female; if (p.outfit === 'man' || p.outfit === 'woman') p.outfit = p.female ? 'woman' : 'man'; }
+      }
+      out.push(p);
     }
     // remaining houses: families of villagers and farmers, sometimes a child
     for (; hi < homes.length; hi++) {

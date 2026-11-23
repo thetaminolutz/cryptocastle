@@ -284,3 +284,32 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .cr-name { width: 100%; font: inherit; font-size: 22px; padding: 10px; margin: 8px 0 12px; background: #0e0a08; color: #f0e0c0; border: 2px solid var(--gold); letter-spacing: 2px; }
 .cr-oath p { margin: 6px 0; font-size: 17px; color: #e8c890; letter-spacing: 1px; }
 .cr-oath .cr-mode { margin-top: 14px; color: var(--ink); font-size: 15px; }
+
+/* ---- journal */
+.journal { display: grid; grid-template-columns: minmax(180px, 38%) 1fr; gap: 14px; min-height: 50vh; }
+.jr-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 62vh; }
+.jr-head { color: #a8987c; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-top: 6px; }
+.jr-item { text-align: left; background: #1a1210; color: var(--ink); border: 2px solid #3a2618; padding: 10px; font: inherit; font-size: 14px; min-height: 48px; }
+.jr-item small { display: block; color: #c8a868; font-size: 11px; letter-spacing: 1px; }
+.jr-item.on { border-color: var(--gold); }
+.jr-item.done { opacity: .55; }
+.jr-pin { color: var(--gold); margin-right: 6px; }
+.jr-detail h3 { margin: 0 0 8px; color: var(--gold); letter-spacing: 2px; }
+.jr-desc { color: #c8b890; font-style: italic; line-height: 1.5; }
+.jr-stage { color: var(--ink); line-height: 1.5; }
+.jr-obj { padding-left: 20px; line-height: 1.7; }
+.jr-obj li.done { color: #7a8a6a; text-decoration: line-through; }
+.jr-past { color: #7a6a58; font-size: 13px; margin: 4px 0; }
+.jr-empty { color: #7a6a58; font-style: italic; }
+
+/* ---- map */
+.map-legend { color: #a8987c; font-size: 13px; margin-bottom: 8px; }
+.map-wrap { position: relative; width: 100%; height: 62vh; border: 2px solid #4a3020; overflow: hidden; touch-action: none; }
+.map-canvas { display: block; touch-action: none; }
+.map-center { position: absolute; right: 8px; bottom: 8px; min-width: 48px; min-height: 48px; padding: 0; }
+
+/* ---- quest board */
+.board-q { border: 2px solid #4a3020; background: #1a1210; padding: 12px; margin-bottom: 10px; }
+.board-q b { color: var(--gold); letter-spacing: 1px; }
+.board-q p { margin: 6px 0; color: #c8b890; line-height: 1.45; }
+.board-q .btn { min-height: 44px; }

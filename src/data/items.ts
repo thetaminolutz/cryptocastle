@@ -58,6 +58,7 @@ add(
   I({ id: 'crystal_shard', name: 'Crystal Shard', cat: 'material', rarity: 'fine', desc: 'Hums when held near the ear.', icon: { shape: 'shard', color: '#7ae0ff', accent: '#a070e0' }, value: 12 }),
   I({ id: 'fiber', name: 'Plant Fiber', cat: 'material', desc: 'Twist it into rope.', icon: { shape: 'fiber', color: '#8aa050' }, value: 0 }),
   I({ id: 'reed', name: 'Reeds', cat: 'material', desc: 'Hollow stems from the water’s edge.', icon: { shape: 'fiber', color: '#a0a060' }, value: 1 }),
+  I({ id: 'torn_map', name: 'Torn Map', cat: 'misc', stack: 1, desc: 'From the robbers’ hoard: the Pale Citadel’s walls, and an arch of pale stone marked “the only way in”.', icon: { shape: 'leaf', color: '#d8c8a0' }, value: 0 }),
   I({ id: 'fern', name: 'Fern Frond', cat: 'material', desc: 'Soothing when crushed.', icon: { shape: 'leaf', color: '#4a9a3a' }, value: 1 }),
   I({ id: 'petals', name: 'Wildflower', cat: 'material', desc: 'Bright petals for dyes.', icon: { shape: 'flower', color: '#e05050', accent: '#f0c040' }, value: 1 }),
   I({ id: 'moonpetal', name: 'Moonpetal', cat: 'material', rarity: 'fine', desc: 'Blooms only in moonlight. A healer’s herb.', icon: { shape: 'flower', color: '#a8d0ff', accent: '#ffffff' }, value: 8 }),

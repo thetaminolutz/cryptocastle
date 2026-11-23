@@ -6,13 +6,15 @@ import { iconUrl } from './icons';
 import { slotHTML } from './hotbar';
 import { buildSettings } from './settings-panel';
 
-export type MenuTab = 'inventory' | 'crafting' | 'settings' | 'save' | 'chest';
+export type MenuTab = 'inventory' | 'crafting' | 'map' | 'journal' | 'settings' | 'save' | 'chest';
 export interface MenuHooks {
   stations(): Set<Station>;
   save(): Promise<void>;
   exportSave(): Promise<void>;
   quit(): void;
   onClose(): void;
+  renderMap(host: HTMLElement): void;
+  renderJournal(host: HTMLElement): void;
 }
 
 const STATION_NAME: Record<Station, string> = { hand: 'By hand', workbench: 'Workbench', campfire: 'Campfire', furnace: 'Furnace', anvil: 'Anvil' };
@@ -40,7 +42,7 @@ export class Menu {
     const tabs = document.createElement('div');
     tabs.className = 'tabs';
     if (tab !== 'chest') this.chest = null;
-    const tabList: [MenuTab, string][] = [['inventory', 'Pack'], ['crafting', 'Craft'], ['settings', 'Settings'], ['save', 'Save']];
+    const tabList: [MenuTab, string][] = [['inventory', 'Pack'], ['crafting', 'Craft'], ['map', 'Map'], ['journal', 'Journal'], ['settings', 'Settings'], ['save', 'Save']];
     if (this.chest) tabList.unshift(['chest', 'Chest']);
     for (const [t, label] of tabList) {
       const b = document.createElement('button');
@@ -76,6 +78,8 @@ export class Menu {
     if (this.tab === 'chest' && this.chest) this.renderChest(b, this.chest);
     else if (this.tab === 'inventory') this.renderInventory(b);
     else if (this.tab === 'crafting') this.renderCrafting(b);
+    else if (this.tab === 'map') this.hooks.renderMap(b);
+    else if (this.tab === 'journal') this.hooks.renderJournal(b);
     else if (this.tab === 'settings') buildSettings(b);
     else this.renderSave(b);
   }

@@ -6,7 +6,7 @@ export const WALL_H = 2.4;
 
 export type Snap = 'cell' | 'edge' | 'corner' | 'free';
 export type PieceCat = 'structure' | 'furniture' | 'light';
-export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim' | 'tablet' | 'rite';
+export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim' | 'tablet' | 'rite' | 'gate' | 'board' | 'waystone' | 'stash' | 'hoard';
 
 /** Local axis-aligned collision box: [minX, minY, minZ, maxX, maxY, maxZ] (rot 0, facing -Z). */
 export type Box = [number, number, number, number, number, number];
@@ -78,6 +78,20 @@ P({ id: 'rite_chest', name: 'Rusty Chest', cat: 'furniture', snap: 'free', cost:
 P({ id: 'flag_one', name: 'Faded Flag', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'banner', hidden: true });
 P({ id: 'straw', name: 'Straw', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'carpet', hidden: true });
 P({ id: 'bones', name: 'Bones', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'carpet', hidden: true });
+
+// ---- the Pale Citadel, the labyrinth, waystones, the graveyard
+P({ id: 'marble_wall', name: 'White Stone Wall', cat: 'structure', snap: 'edge', cost: [], boxes: [[-1, 0, -0.3, 1, WALL_H, 0.3]], top: WALL_H, icon: 'wall', hidden: true });
+P({ id: 'marble_half', name: 'White Parapet', cat: 'structure', snap: 'free', cost: [], boxes: [[-1, 0, -0.25, 1, 1.3, 0.25]], top: 1.3, icon: 'halfwall', hidden: true });
+P({ id: 'crenel', name: 'Crenellation', cat: 'structure', snap: 'edge', cost: [], boxes: [[-1, 0, -0.3, 1, 0.9, 0.3]], top: 0.9, icon: 'wall', hidden: true });
+P({ id: 'wall_tower', name: 'Wall Tower', cat: 'structure', snap: 'free', cost: [], boxes: [[-2.2, 0, -2.2, 2.2, 10, 2.2]], top: 10, icon: 'pillar', hidden: true, light: [2.6, 1.5, 0.6, 10] });
+P({ id: 'citadel_gate', name: 'Sealed Gate', cat: 'structure', snap: 'free', cost: [], boxes: [[-4, 0, -0.5, 4, 5.4, 0.5]], top: 5.4, use: 'gate', icon: 'door', hidden: true });
+P({ id: 'lab_arch', name: 'Labyrinth Arch', cat: 'structure', snap: 'free', cost: [], boxes: [[-2.6, 3.2, -0.6, 2.6, 4.0, 0.6]], top: 4, icon: 'door', hidden: true });
+P({ id: 'quest_board', name: 'Quest Board', cat: 'furniture', snap: 'free', cost: [], boxes: [[-1, 0, -0.15, 1, 2.2, 0.15]], top: 2.2, use: 'board', icon: 'painting', hidden: true });
+P({ id: 'waystone', name: 'Waystone', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.4, 0, -0.4, 0.4, 2.0, 0.4]], top: 2, use: 'waystone', icon: 'claim', hidden: true, light: [0.5, 0.9, 1.6, 6] });
+P({ id: 'stash', name: 'Bank Vault', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.6, 0, -0.4, 0.6, 1.2, 0.4]], top: 1.2, use: 'stash', icon: 'chest', hidden: true });
+P({ id: 'gravestone', name: 'Gravestone', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.35, 0, -0.1, 0.35, 0.9, 0.1]], top: 0.9, icon: 'claim', hidden: true });
+P({ id: 'grave_pit', name: 'Open Grave', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'carpet', hidden: true });
+P({ id: 'hoard_chest', name: 'Robbers\' Hoard', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.5, 0, -0.35, 0.5, 0.65, 0.35]], top: 0.65, use: 'hoard', icon: 'chest', hidden: true });
 
 export const CLAIM_RADIUS = 22;
 

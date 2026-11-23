@@ -100,6 +100,7 @@ function towerPieces(y0: number): Piece[] {
   tabs.forEach(([x, z, r], i) => out.push({ id: 'tablet', x, y: y0, z, rot: rotFor(r), gen: true, open: false, items: [{ id: `tablet${i}`, n: i }] } as Piece));
   push('straw', x0 + 1.3, y0, z0 + 5); push('straw', x0 + 4.6, y0, z0 + 4.8); push('bones', x0 + 3.6, y0, z0 + 3.2); push('bones', x0 + 1.6, y0, z0 + 2.6);
   push('rite_chest', x0 + 3, y0, z0 + 2.2, 0);
+  push('waystone', x0 + 9, y0 - 0.1, z0 + 9, 0);
   push('wall_torch', x0 + 2, y0, z0 + 0.2, Math.PI); push('wall_torch', x0 + 4, y0, z0 + 5.8, 0);
   return out;
 }
@@ -111,6 +112,8 @@ export interface StoryHooks {
   openCreation(step: number, done: () => void): void;
   reveal(): void;
   setTime(t: number): void;
+  /** story flag for the quest log */
+  flag(name: string): void;
 }
 
 export class Story {
@@ -199,7 +202,6 @@ export class Story {
       }
       case 'gorge': this.hooks.objective('Face the rider', h.pos); break;
       case 'tower': case 'rite': this.hooks.objective(this.step === 'tower' ? 'Enter the Tower of the First Rite' : `Complete the First Rite (${this.tablets}/${RITE_STEPS})`, V(TOWER.x, 0, TOWER.z)); break;
-      default: this.hooks.objective(null, null);
     }
     void time;
   }
@@ -225,7 +227,7 @@ export class Story {
       'Beware the rider with amber eyes. He will offer you everything. He will want something back.',
       'Follow the stream to the gorge. He is waiting there. He is always waiting.'
     ] : ['The gorge, little lamb. Follow the stream. And remember what I said about the rider.'];
-    this.say('The Ashen Stranger', '#b8c8d8', lines, () => { if (this.step === 'wake') { this.step = 'stranger'; this.hooks.toast('Objective: follow the stream to the gorge.', '#e8d8a8'); } });
+    this.say('The Ashen Stranger', '#b8c8d8', lines, () => { this.hooks.flag('met_stranger'); if (this.step === 'wake') { this.step = 'stranger'; this.hooks.toast('Objective: follow the stream to the gorge.', '#e8d8a8'); } });
   }
 
   private heraldSpeaks() {
@@ -236,6 +238,7 @@ export class Story {
       'You chose how you would walk this world, before you ever woke. Whether you may fall and rise again, or fall only once. Remember which.',
       'Now go to the tower beyond the gorge. Read the seven tablets. Become someone. We will meet again — I wish you luck, and the right choices.'
     ], () => {
+      this.hooks.flag('met_herald');
       this.step = 'tower';
       this.hooks.toast('Objective: enter the Tower of the First Rite.', '#e8d8a8');
       setTimeout(() => { this.heraldT = -1; audio.hoof(0.6); }, 4000);
@@ -262,12 +265,14 @@ export class Story {
 
   private finish() {
     this.profile.created = true;
+    this.hooks.flag('rite_done');
     this.step = 'free';
     this.hooks.reveal();
     this.hooks.setTime(0.3);
     this.say('The Herald', '#e8a030', [
       `${this.profile.name}. A fitting name. I will remember it — I remember everything.`,
       'Go out into the light now. The world is wide, and it is waiting to see what you will do with it.',
+      'One more thing. Grave robbers dig in the old barrow cemetery, north-east of here. What they took belongs to me. Bring it back — and see what else you find.',
       'I wish you luck, and the right choices. We will meet again.'
     ], () => {});
   }

@@ -19,7 +19,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M7 Combat, first 10 enemies, loot, death/respawn, game modes | ✅ done |
 | M8 Villages, NPCs with schedules, dialogue, shops, reputation | ✅ done |
 | M9 Opening, Ashen Stranger, Herald, Tower of the First Rite, character creation | ✅ done |
-| M10 Quests, journal, map, the Pale Citadel | next |
+| M10 Quests, journal, map, main story chapters 1–4, the Pale Citadel | ✅ done |
+| M11 Remaining enemies, bosses, dungeons, unique items, armour sets | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -111,6 +112,26 @@ face outside the tower in the morning. Race, calling and gifts really change
 the numbers: life, stamina, speed, jump, swimming and breath, damage taken,
 damage dealt, crits, life steal (Vampire), fire and curse procs, block, herb
 yield, merchant prices and night vision.
+
+**Quests, map and the Pale Citadel (M10):** a data-driven quest system
+(`src/data/quests.ts`: stages of goto / kill / collect / flag objectives,
+rewards, follow-ups) with a **Journal** tab (active, side and finished quests;
+track a quest to drive the HUD arrow) and a **Map** tab: a fog-of-war parchment
+map that reveals as you explore, with your position, home, discovered villages,
+the citadel, quest targets, your lost pack and your own pins (tap to place or
+remove; drag to pan, pinch to zoom). **Waystones** stand in every village square,
+by the tower and in the citadel: touch one to attune it, touch any attuned one to
+open the travel map (10 gold per trip). The main story continues: **Chapter 2**
+— grave robbers at the old barrow cemetery and their hoard (with a torn map);
+**Chapter 3** — the **scorpion labyrinth**, a 13×13-cell maze carved into the
+rock 12 m beneath the Pale Citadel (torches, bones, giant scorpions), entered
+through a pale arch outside the sealed gate and left by a long stair up into the
+courtyard; **Chapter 4** — the **arena trials** (the pack, the champion, the
+beast; fight again for coin afterwards). **The Pale Citadel** is a walled hub
+city with white walls, corner towers and a sealed gate, two inns (*The Last
+Thread*, run by **Atropos**, and *The Gilded Spindle*), a smithy, a bank with your
+own vault (24 slots), a chapel, market stalls, a quest board with side quests,
+an arena master (Kallias the Unbowed) and townsfolk with daily lives.
 
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera (tap an enemy to lock on), **Strike/Mine/Chop/Dig** (hold to keep swinging), **Block**,
