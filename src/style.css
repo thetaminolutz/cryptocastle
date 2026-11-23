@@ -313,3 +313,19 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .board-q b { color: var(--gold); letter-spacing: 1px; }
 .board-q p { margin: 6px 0; color: #c8b890; line-height: 1.45; }
 .board-q .btn { min-height: 44px; }
+
+/* ---- equipment */
+.doll { display: grid; grid-template-columns: repeat(3, auto); gap: 10px 14px; justify-content: start; margin-bottom: 14px; }
+.doll-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.doll-cell span { font-size: 11px; color: #a8987c; letter-spacing: 1px; }
+.info .lore { color: #c8a868; font-style: italic; line-height: 1.45; border-left: 2px solid #5a3a22; padding-left: 8px; }
+.info .stat.set { line-height: 1.5; }
+.info .stat.set span { color: #6a5a48; }
+.info .stat.set span.on { color: #8ad070; }
+.muted { color: #7a6a58; font-style: italic; }
+
+/* ---- boss bar */
+.boss-bar { display: none; position: absolute; left: 50%; transform: translateX(-50%); top: calc(54px + var(--sat)); width: min(560px, 70vw); text-align: center; pointer-events: none; }
+.boss-bar .bname { color: #f0d8a8; font-size: 18px; letter-spacing: 3px; text-shadow: 1px 1px 0 #000, 0 0 8px #000; margin-bottom: 4px; }
+.boss-bar .bname small { display: block; font-size: 11px; color: #a8987c; letter-spacing: 2px; }
+.boss-bar .bbar { height: 12px; width: 100%; }

@@ -20,6 +20,10 @@ export class Hud {
   private level: HTMLDivElement;
   readonly lockMark: HTMLDivElement;
   private objective: HTMLDivElement;
+  private boss: HTMLDivElement;
+  private bossFill: HTMLDivElement;
+  private bossName: HTMLDivElement;
+  private bossKey = '';
   private objKey = '';
   private bannerTimer = 0;
   private last = '';
@@ -73,6 +77,12 @@ export class Hud {
     this.banner.className = 'region-banner';
     const vignette = document.createElement('div');
     vignette.className = 'vignette';
+    this.boss = document.createElement('div'); this.boss.className = 'boss-bar';
+    this.bossName = document.createElement('div'); this.bossName.className = 'bname';
+    const bb = document.createElement('div'); bb.className = 'bar life bbar';
+    this.bossFill = document.createElement('div'); this.bossFill.className = 'fill'; bb.appendChild(this.bossFill);
+    this.boss.append(this.bossName, bb);
+    this.root.append(this.boss);
     this.root.append(vignette, this.flash, this.banner, this.top, this.target, this.lockMark, bars, menu, view, build);
     parent.appendChild(this.root);
   }
@@ -118,6 +128,13 @@ export class Hud {
     this.objKey = key;
     this.objective.style.display = 'block';
     this.objective.innerHTML = `<span class="obj-arrow">${arrow}</span> ${text}<small>${dist}</small>`;
+  }
+  /** The big boss health bar (null hides it). */
+  setBoss(name: string | null, title = '', frac = 1) {
+    if (!name) { if (this.bossKey) { this.bossKey = ''; this.boss.style.display = 'none'; } return; }
+    const key = name + title;
+    if (key !== this.bossKey) { this.bossKey = key; this.boss.style.display = 'block'; this.bossName.innerHTML = `${name}<small>${title}</small>`; }
+    this.bossFill.style.width = `${Math.max(0, frac) * 100}%`;
   }
   setLevel(level: number, frac: number) { this.level.textContent = `Lv ${level}`; this.level.style.setProperty('--xp', `${frac * 100}%`); }
 

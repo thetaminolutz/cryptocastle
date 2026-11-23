@@ -4,6 +4,7 @@
 // roll, tool swings, harvesting). The cloak follows on springs.
 // The face under the hood is smooth and blank (the Nameless One) until character
 // creation gives it one.
+import type { WornLook } from '../game/equipment';
 import * as THREE from 'three';
 import type { Player } from './player';
 import { Look, RACES, HAIR_COLORS, CLOTH_COLORS } from '../data/character';
@@ -141,12 +142,25 @@ const B = BONES;
 const R = (y: number, x: number, z: number, rx: number, rz: number, w: Weights): Ring => ({ c: V(x, y, z), rx, rz, w });
 const mixW = (a: number, b: number, t: number): Weights => [[a, 1 - t], [b, t]];
 
-function buildBody(b: SkinBuilder, look: Look | null = null) {
+function buildBody(b: SkinBuilder, look: Look | null = null, gear: WornLook = {}) {
   // palette
   const race = look ? RACES.find((r) => r.id === look.race)! : null;
   const SKIN = look ? race!.skin[look.skin % race!.skin.length] : 0xc4b6aa;
   const TUNIC = look ? CLOTH_COLORS[look.jacket] : 0x5a3d2b, PANTS = look ? CLOTH_COLORS[look.trousers] : 0x3a3330;
-  const LEATHER = 0x4a3020, BOOT = look ? [0x2e221a, 0x4a3020, 0x1a1a1c, 0x5a4a3a][look.boots % 4] : 0x2e221a, CLOAK = 0x2a3a34, HOOD_IN = 0x120e0c, BRASS = 0xb08a40;
+  let LEATHER = 0x4a3020, BOOT = look ? [0x2e221a, 0x4a3020, 0x1a1a1c, 0x5a4a3a][look.boots % 4] : 0x2e221a, CLOAK = 0x2a3a34;
+  const HOOD_IN = 0x120e0c, BRASS = gear.chest?.trim ?? 0xb08a40;
+  // worn gear recolours the clothes
+  let TUNIC_ = TUNIC, PANTS_ = PANTS, GLOVE = 0x3a2618;
+  const ch = gear.chest;
+  if (ch && ch.style !== 'plate') TUNIC_ = ch.color;
+  if (ch?.style === 'plate') TUNIC_ = 0x4a4038;
+  if (gear.legs) PANTS_ = gear.legs.metal ? 0x3a3a3e : gear.legs.color;
+  if (gear.boots) BOOT = gear.boots.color;
+  if (gear.gloves) GLOVE = gear.gloves.color;
+  if (gear.cloak) CLOAK = gear.cloak.color;
+  if (ch?.style === 'leather') LEATHER = 0x2a1a10;
+  const TORSO_M = ch?.style === 'mail' ? M.Metal : M.Cloth;
+  const BOOT_M = gear.boots?.metal ? M.Metal : M.Leather, GLOVE_M = gear.gloves?.metal ? M.Metal : M.Leather;
 
   // ---- legs (pants) with knee blending
   for (const s of [-1, 1]) {
@@ -160,21 +174,27 @@ function buildBody(b: SkinBuilder, look: Look | null = null) {
       R(0.5, x, 0, 0.058, 0.06, mixW(th, sh, 0.7)),
       R(0.4, x, 0.008, 0.06, 0.066, [[sh, 1]]),
       R(0.3, x, 0.004, 0.05, 0.054, [[sh, 1]])
-    ], PANTS, { uv: [3, 4] });
+    ], PANTS_, { uv: [3, 4] });
     // boots: shaft + foot
-    b.loft(M.Leather, [
+    b.loft(BOOT_M, [
       R(0.36, x, 0.005, 0.062, 0.068, [[sh, 1]]),
       R(0.34, x, 0.005, 0.066, 0.07, [[sh, 1]]),
       R(0.16, x, 0.0, 0.052, 0.058, [[sh, 1]]),
       R(0.1, x, -0.005, 0.054, 0.062, mixW(sh, ft, 0.5))
     ], BOOT, { capStart: true });
-    b.loft(M.Leather, [
+    b.loft(BOOT_M, [
       { c: V(x, 0.07, 0.06), rx: 0.05, rz: 0.055, w: [[ft, 1]] },
       { c: V(x, 0.06, -0.02), rx: 0.052, rz: 0.06, w: [[ft, 1]] },
       { c: V(x, 0.045, -0.12), rx: 0.046, rz: 0.04, w: [[ft, 1]] },
       { c: V(x, 0.04, -0.16), rx: 0.03, rz: 0.028, w: [[ft, 1]] }
     ], BOOT, { capStart: true, capEnd: true });
     b.loft(M.Leather, [R(0.335, x, 0.005, 0.072, 0.077, [[sh, 1]]), R(0.31, x, 0.005, 0.072, 0.077, [[sh, 1]])], 0x3a2a1e, { capEnd: false }); // cuff
+    if (gear.legs?.metal) {
+      // greaves over the shins and plates on the thighs
+      b.loft(M.Metal, [R(0.52, x, -0.01, 0.066, 0.07, mixW(th, sh, 0.8)), R(0.42, x, -0.008, 0.068, 0.072, [[sh, 1]]), R(0.34, x, -0.004, 0.07, 0.074, [[sh, 1]])], gear.legs.color, { capStart: true, arc: [Math.PI * 1.1, Math.PI * 1.9] });
+      b.blob(M.Metal, V(x, 0.52, -0.06), V(0.045, 0.04, 0.03), gear.legs.color, mixW(th, sh, 0.5), 8);
+      b.loft(M.Metal, [R(0.92, x, -0.01, 0.1, 0.1, [[th, 1]]), R(0.7, x, -0.01, 0.084, 0.086, [[th, 1]])], gear.legs.color, { arc: [Math.PI * 1.05, Math.PI * 1.95] });
+    }
   }
 
   // ---- torso (tunic) with spine blending
@@ -187,13 +207,35 @@ function buildBody(b: SkinBuilder, look: Look | null = null) {
     R(1.42, 0, 0, 0.18, 0.11, [[B.chest, 1]]),
     R(1.49, 0, 0.005, 0.12, 0.085, mixW(B.chest, B.neck, 0.3)),
     R(1.53, 0, 0.005, 0.055, 0.055, mixW(B.chest, B.neck, 0.7))
-  ], TUNIC, { seg: 16, uv: [4, 4] });
+  ], TUNIC_, { seg: 16, uv: [4, 4] });
+  if (TORSO_M === M.Metal) b.loft(M.Metal, [R(1.44, 0, 0, 0.185, 0.115, [[B.chest, 1]]), R(1.2, 0, -0.005, 0.16, 0.11, mixW(B.spine, B.chest, 0.4)), R(0.98, 0, 0, 0.17, 0.12, [[B.hips, 1]])], ch!.color, { seg: 16 });
+  if (ch?.style === 'plate') {
+    // breastplate, backplate and pauldrons
+    b.loft(M.Metal, [
+      R(1.49, 0, 0.0, 0.13, 0.09, mixW(B.chest, B.neck, 0.3)),
+      R(1.42, 0, -0.004, 0.192, 0.122, [[B.chest, 1]]),
+      R(1.3, 0, -0.01, 0.186, 0.124, [[B.chest, 1]]),
+      R(1.16, 0, -0.004, 0.165, 0.115, mixW(B.spine, B.chest, 0.3)),
+      R(1.02, 0, 0, 0.172, 0.122, [[B.hips, 0.7], [B.spine, 0.3]])
+    ], ch.color, { seg: 18 });
+    for (const s of [-1, 1]) {
+      const ua = s < 0 ? B.upperArmL : B.upperArmR;
+      b.blob(M.Metal, V(s * 0.2, 1.47, 0), V(0.085, 0.06, 0.09), ch.color, [[B.chest, 0.4], [ua, 0.6]], 12);
+      b.blob(M.Metal, V(s * 0.215, 1.43, 0), V(0.075, 0.035, 0.08), ch.trim ?? ch.color, [[ua, 1]], 10);
+    }
+    if (ch.trim) b.loft(M.Metal, [R(1.02, 0, 0, 0.175, 0.125, [[B.hips, 1]]), R(0.99, 0, 0, 0.176, 0.126, [[B.hips, 1]])], ch.trim, { seg: 18 });
+  }
   // tunic skirt: flares over the thighs, ragged hem
   b.loft(M.Cloth, [
     R(0.98, 0, 0, 0.168, 0.118, [[B.hips, 1]]),
     R(0.85, 0, 0, 0.19, 0.14, [[B.hips, 0.7], [B.thighL, 0.15], [B.thighR, 0.15]]),
     R(0.7, 0, 0.005, 0.215, 0.16, [[B.hips, 0.5], [B.thighL, 0.25], [B.thighR, 0.25]])
-  ], TUNIC, { seg: 18, jag: 0.05 });
+  ], TUNIC_, { seg: 18, jag: 0.05 });
+  if (ch?.style === 'robe') b.loft(M.Cloth, [
+    R(0.72, 0, 0.005, 0.21, 0.16, [[B.hips, 0.5], [B.thighL, 0.25], [B.thighR, 0.25]]),
+    R(0.45, 0, 0.01, 0.24, 0.19, [[B.hips, 0.3], [B.thighL, 0.35], [B.thighR, 0.35]]),
+    R(0.16, 0, 0.015, 0.27, 0.22, [[B.hips, 0.2], [B.shinL, 0.4], [B.shinR, 0.4]])
+  ], ch.color, { seg: 18, jag: 0.04 });
   // belt, buckle, pouches
   b.loft(M.Leather, [R(1.01, 0, 0, 0.168, 0.118, [[B.hips, 1]]), R(0.95, 0, 0, 0.172, 0.121, [[B.hips, 1]])], LEATHER, { seg: 18 });
   b.blob(M.Metal, V(0, 0.98, -0.122), V(0.03, 0.028, 0.012), BRASS, [[B.hips, 1]], 8);
@@ -210,15 +252,15 @@ function buildBody(b: SkinBuilder, look: Look | null = null) {
       R(1.2, x(0.22), 0, 0.046, 0.048, mixW(ua, fa, 0.35)),
       R(1.15, x(0.22), 0, 0.044, 0.046, mixW(ua, fa, 0.7)),
       R(1.08, x(0.225), -0.004, 0.045, 0.046, [[fa, 1]])
-    ], TUNIC, { uv: [2, 3] });
-    b.loft(M.Leather, [
+    ], TUNIC_, { uv: [2, 3] });
+    b.loft(GLOVE_M, [
       R(1.1, x(0.225), -0.004, 0.05, 0.051, [[fa, 1]]),
       R(1.0, x(0.23), -0.002, 0.042, 0.042, [[fa, 1]]),
       R(0.95, x(0.232), 0, 0.037, 0.035, mixW(fa, hd, 0.4))
-    ], LEATHER, { capStart: true });
+    ], gear.gloves ? GLOVE : LEATHER, { capStart: true });
     // gloved hand (mitten + thumb)
-    b.blob(M.Leather, V(x(0.235), 0.88, -0.005), V(0.032, 0.06, 0.042), 0x3a2618, [[hd, 1]], 10);
-    b.blob(M.Leather, V(x(0.22), 0.9, -0.035), V(0.016, 0.035, 0.016), 0x3a2618, [[hd, 1]], 6);
+    b.blob(GLOVE_M, V(x(0.235), 0.88, -0.005), V(0.032, 0.06, 0.042), GLOVE, [[hd, 1]], 10);
+    b.blob(GLOVE_M, V(x(0.22), 0.9, -0.035), V(0.016, 0.035, 0.016), GLOVE, [[hd, 1]], 6);
   }
 
   // ---- neck & head (blank, smooth face)
@@ -232,10 +274,22 @@ function buildBody(b: SkinBuilder, look: Look | null = null) {
   const H = [[1.5, 0.13, 0.13, 0.02], [1.58, 0.135, 0.14, 0.015], [1.68, 0.13, 0.142, 0.012], [1.77, 0.11, 0.125, 0.02], [1.83, 0.07, 0.085, 0.045], [1.86, 0.02, 0.03, 0.09]];
   for (const [y, rx, rz, z] of H) hoodRings.push({ c: V(0, y, z), rx, rz, w: y < 1.55 ? [[B.neck, 0.5], [B.head, 0.5]] : [[B.head, 1]] });
   const HOOD_ARC: [number, number] = [Math.PI / 2 - Math.PI * 0.78, Math.PI / 2 + Math.PI * 0.78]; // open at the face (-z)
-  if (!look || look.headwear === 1) {
-    b.loft(M.Cloth, hoodRings, CLOAK, { seg: 16, arc: HOOD_ARC, uv: [3, 2] });
+  const hg = gear.head;
+  if (hg && (hg.style === 'helm' || hg.style === 'cap')) {
+    if (hg.style === 'helm') {
+      b.loft(M.Metal, [R(1.66, 0, 0.0, 0.118, 0.128, [[B.head, 1]]), R(1.76, 0, 0.0, 0.116, 0.126, [[B.head, 1]]), R(1.83, 0, 0.005, 0.09, 0.1, [[B.head, 1]]), R(1.87, 0, 0.01, 0.04, 0.05, [[B.head, 1]])], hg.color, { capEnd: true, seg: 16 });
+      b.blob(M.Metal, V(0, 1.7, -0.13), V(0.012, 0.05, 0.012), hg.color, [[B.head, 1]], 6); // nasal
+      if (hg.trim) b.loft(M.Metal, [R(1.665, 0, 0, 0.122, 0.132, [[B.head, 1]]), R(1.69, 0, 0, 0.122, 0.132, [[B.head, 1]])], hg.trim, { seg: 16 });
+    } else b.loft(M.Leather, [R(1.74, 0, 0.0, 0.112, 0.122, [[B.head, 1]]), R(1.8, 0, 0.005, 0.1, 0.11, [[B.head, 1]]), R(1.84, 0, 0.01, 0.06, 0.07, [[B.head, 1]])], hg.color, { capEnd: true });
+  } else if (hg && (hg.style === 'crown' || hg.style === 'circlet')) {
+    b.loft(M.Metal, [R(1.775, 0, 0.0, 0.106, 0.116, [[B.head, 1]]), R(1.8, 0, 0.0, 0.106, 0.116, [[B.head, 1]])], hg.color, { seg: 16 });
+    if (hg.style === 'crown') for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; b.blob(M.Metal, V(Math.sin(a) * 0.104, 1.83, Math.cos(a) * 0.114), V(0.012, 0.035, 0.012), hg.trim ?? hg.color, [[B.head, 1]], 5); }
+    else b.blob(M.Metal, V(0, 1.79, -0.118), V(0.014, 0.014, 0.008), 0xa8d8ff, [[B.head, 1]], 6);
+  } else if (hg?.style === 'hood' || !look || look.headwear === 1) {
+    const HOOD = hg?.style === 'hood' ? hg.color : CLOAK;
+    b.loft(M.Cloth, hoodRings, HOOD, { seg: 16, arc: HOOD_ARC, uv: [3, 2] });
     b.loft(M.Lining, hoodRings.map((r) => ({ ...r, rx: r.rx - 0.008, rz: r.rz - 0.008 })), HOOD_IN, { seg: 16, arc: HOOD_ARC });
-  } else if (look.headwear === 2) {
+  } else if (look?.headwear === 2) {
     b.loft(M.Leather, [R(1.74, 0, 0.0, 0.112, 0.122, [[B.head, 1]]), R(1.8, 0, 0.005, 0.1, 0.11, [[B.head, 1]]), R(1.84, 0, 0.01, 0.06, 0.07, [[B.head, 1]])], 0x5a3a22, { capEnd: true });
   }
   // mantle over the shoulders
@@ -323,13 +377,16 @@ function weaveTexture(kind: 'cloth' | 'leather'): THREE.DataTexture {
   return t;
 }
 
+/** environment reflections for metal (set once by the game) */
+export const METAL_ENV: { tex: THREE.Texture | null } = { tex: null };
+
 function makeMaterials(): THREE.Material[] {
   const cloth = weaveTexture('cloth'), leather = weaveTexture('leather');
   return [
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0 }),
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, normalMap: cloth, normalScale: new THREE.Vector2(0.3, 0.3), side: THREE.DoubleSide }),
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, normalMap: leather, normalScale: new THREE.Vector2(0.5, 0.5), side: THREE.DoubleSide }),
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.9 }),
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.75, envMap: METAL_ENV.tex, envMapIntensity: 0.5 }),
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide }),
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 })
   ];
@@ -386,6 +443,7 @@ export class HeroModel {
     buildBody(builder);
     const geo = builder.build();
     this.mesh = new THREE.SkinnedMesh(geo, makeMaterials());
+    this.metal = (this.mesh.material as THREE.MeshStandardMaterial[])[3];
     this.mesh.add(this.bones[0]);
     this.mesh.bind(new THREE.Skeleton(this.bones));
     this.mesh.frustumCulled = false;
@@ -426,11 +484,19 @@ export class HeroModel {
     this.shieldSlot.add(mesh, boss);
   }
   blocking = false;
+  private metal!: THREE.MeshStandardMaterial;
+  /** metal reflection strength (follows daylight) */
+  setMetalEnv(tex: THREE.Texture, k: number) { if (this.metal.envMap !== tex) { this.metal.envMap = tex; this.metal.needsUpdate = true; } this.metal.envMapIntensity = k; }
 
   /** Rebuild the body for a created character (null = the faceless Nameless One). */
+  private look: Look | null = null;
+  private gear: WornLook = {};
+  /** Rebuild with the given worn gear (keeps the current look). */
+  setGear(gear: WornLook) { this.gear = gear; this.setLook(this.look); }
   setLook(look: Look | null) {
+    this.look = look;
     const builder = new SkinBuilder(6);
-    buildBody(builder, look);
+    buildBody(builder, look, this.gear);
     const old = this.mesh.geometry;
     this.mesh.geometry = builder.build();
     old.dispose();

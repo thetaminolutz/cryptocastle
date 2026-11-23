@@ -131,6 +131,45 @@ function draw(c: CanvasRenderingContext2D, shape: IconShape, col: string, acc?: 
       c.fillStyle = grad(10, 6, 54, 58); c.beginPath(); c.moveTo(10, 10); c.lineTo(54, 10); c.lineTo(52, 34); c.quadraticCurveTo(46, 52, 32, 58); c.quadraticCurveTo(18, 52, 12, 34); c.closePath(); c.fill();
       c.strokeStyle = shade(col, 0.55); c.lineWidth = 3; c.stroke(); c.fillStyle = '#c8a040'; c.beginPath(); c.arc(32, 30, 5, 0, 7); c.fill();
       break;
+    case 'dagger':
+      handle(c, 16, 52, 24, 44, 6); c.fillStyle = '#5a4030'; c.fillRect(18, 40, 12, 4);
+      c.fillStyle = grad(24, 18, 48, 42); c.beginPath(); c.moveTo(26, 42); c.lineTo(46, 20); c.lineTo(48, 18); c.lineTo(30, 44); c.closePath(); c.fill();
+      break;
+    case 'saber':
+      handle(c, 12, 56, 22, 46, 6); c.strokeStyle = '#c8a040'; c.lineWidth = 2; c.beginPath(); c.arc(18, 50, 7, -0.5, 1.8); c.stroke();
+      c.fillStyle = grad(20, 8, 56, 44); c.beginPath(); c.moveTo(22, 44); c.quadraticCurveTo(36, 18, 58, 6); c.quadraticCurveTo(42, 26, 27, 47); c.closePath(); c.fill();
+      break;
+    case 'longsword':
+      handle(c, 8, 60, 20, 48, 6); c.fillStyle = acc ?? '#5a4030'; c.fillRect(10, 42, 18, 5);
+      c.fillStyle = grad(18, 4, 60, 46); c.beginPath(); c.moveTo(20, 46); c.lineTo(56, 6); c.lineTo(60, 4); c.lineTo(58, 8); c.lineTo(24, 48); c.closePath(); c.fill();
+      break;
+    case 'hammer': handle(c, 14, 58, 40, 20, 6); c.fillStyle = grad(28, 6, 58, 30); c.save(); c.translate(42, 17); c.rotate(-0.75); c.fillRect(-14, -8, 28, 16); c.restore(); break;
+    case 'whip': c.strokeStyle = col; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(14, 54); c.bezierCurveTo(10, 20, 50, 50, 54, 12); c.stroke(); handle(c, 10, 60, 18, 48, 7); c.fillStyle = '#e8e0cc'; c.beginPath(); c.moveTo(54, 12); c.lineTo(60, 8); c.lineTo(56, 16); c.fill(); break;
+    case 'bow':
+      c.strokeStyle = grad(10, 6, 54, 58); c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.arc(4, 60, 52, -1.45, -0.12); c.stroke();
+      c.strokeStyle = '#e8e0cc'; c.lineWidth = 1; c.beginPath(); c.moveTo(8, 8); c.lineTo(56, 56); c.stroke();
+      break;
+    case 'crossbow':
+      c.fillStyle = '#6a4a2a'; c.save(); c.translate(32, 32); c.rotate(-0.78); c.fillRect(-4, -4, 36, 8); c.restore();
+      c.strokeStyle = col; c.lineWidth = 4; c.beginPath(); c.moveTo(12, 30); c.quadraticCurveTo(22, 22, 34, 12); c.stroke();
+      c.strokeStyle = '#e8e0cc'; c.lineWidth = 1; c.beginPath(); c.moveTo(12, 30); c.lineTo(34, 12); c.stroke();
+      break;
+    case 'wand': handle(c, 16, 52, 44, 16, 4); c.fillStyle = col; c.shadowColor = col; c.shadowBlur = 10; c.beginPath(); c.arc(46, 14, 5, 0, 7); c.fill(); c.shadowBlur = 0; break;
+    case 'head':
+      c.fillStyle = grad(12, 10, 52, 50); c.beginPath(); c.moveTo(12, 44); c.quadraticCurveTo(12, 10, 32, 10); c.quadraticCurveTo(52, 10, 52, 44); c.lineTo(44, 44); c.lineTo(44, 30); c.lineTo(20, 30); c.lineTo(20, 44); c.closePath(); c.fill();
+      c.fillStyle = shade(col, 0.7); c.fillRect(30, 30, 4, 16);
+      if (acc) { c.fillStyle = acc; for (let i = 0; i < 5; i++) { c.beginPath(); c.moveTo(14 + i * 9, 14); c.lineTo(18 + i * 9, 4); c.lineTo(22 + i * 9, 14); c.fill(); } }
+      break;
+    case 'chest':
+      c.fillStyle = grad(10, 8, 54, 58); c.beginPath(); c.moveTo(18, 8); c.lineTo(46, 8); c.lineTo(56, 18); c.lineTo(50, 28); c.lineTo(48, 56); c.lineTo(16, 56); c.lineTo(14, 28); c.lineTo(8, 18); c.closePath(); c.fill();
+      c.strokeStyle = shade(col, 0.55); c.lineWidth = 2; c.beginPath(); c.moveTo(32, 12); c.lineTo(32, 54); c.stroke();
+      break;
+    case 'legs': c.fillStyle = grad(14, 6, 50, 58); c.beginPath(); c.moveTo(16, 8); c.lineTo(48, 8); c.lineTo(50, 58); c.lineTo(36, 58); c.lineTo(32, 24); c.lineTo(28, 58); c.lineTo(14, 58); c.closePath(); c.fill(); break;
+    case 'boots': c.fillStyle = grad(10, 10, 54, 56); c.beginPath(); c.moveTo(20, 8); c.lineTo(36, 8); c.lineTo(36, 40); c.lineTo(54, 46); c.lineTo(54, 56); c.lineTo(16, 56); c.closePath(); c.fill(); break;
+    case 'gloves': c.fillStyle = grad(12, 8, 52, 58); c.beginPath(); c.moveTo(18, 58); c.lineTo(18, 30); c.lineTo(14, 18); c.lineTo(20, 16); c.lineTo(24, 26); c.lineTo(24, 8); c.lineTo(30, 8); c.lineTo(31, 24); c.lineTo(34, 6); c.lineTo(40, 6); c.lineTo(39, 24); c.lineTo(44, 10); c.lineTo(50, 12); c.lineTo(46, 34); c.lineTo(46, 58); c.closePath(); c.fill(); break;
+    case 'cloak': c.fillStyle = grad(8, 6, 56, 58); c.beginPath(); c.moveTo(24, 8); c.lineTo(40, 8); c.quadraticCurveTo(58, 34, 54, 58); c.lineTo(10, 58); c.quadraticCurveTo(6, 34, 24, 8); c.fill(); c.fillStyle = '#c8a040'; c.beginPath(); c.arc(32, 12, 4, 0, 7); c.fill(); break;
+    case 'ring': c.strokeStyle = grad(14, 14, 50, 50); c.lineWidth = 7; c.beginPath(); c.arc(32, 36, 15, 0, 7); c.stroke(); c.fillStyle = acc ?? shade(col, 1.4); c.beginPath(); c.arc(32, 18, 6, 0, 7); c.fill(); break;
+    case 'amulet': c.strokeStyle = '#a89870'; c.lineWidth = 2; c.beginPath(); c.arc(32, 22, 18, 0.2, Math.PI - 0.2); c.stroke(); c.fillStyle = grad(20, 30, 44, 58); c.beginPath(); c.moveTo(32, 32); c.lineTo(44, 44); c.lineTo(32, 58); c.lineTo(20, 44); c.closePath(); c.fill(); break;
     case 'meat': c.fillStyle = grad(8, 14, 50, 50); c.beginPath(); c.ellipse(28, 34, 20, 15, -0.4, 0, 7); c.fill(); c.fillStyle = '#e8e0cc'; c.fillRect(42, 14, 6, 18); c.beginPath(); c.arc(45, 12, 5, 0, 7); c.fill(); break;
     case 'hide': c.fillStyle = grad(8, 10, 56, 54); c.beginPath(); c.moveTo(12, 14); c.quadraticCurveTo(32, 20, 52, 14); c.lineTo(48, 32); c.lineTo(56, 52); c.quadraticCurveTo(32, 44, 8, 52); c.lineTo(16, 32); c.closePath(); c.fill(); break;
     case 'bone': c.strokeStyle = col; c.lineWidth = 7; c.lineCap = 'round'; c.beginPath(); c.moveTo(16, 48); c.lineTo(48, 16); c.stroke(); c.fillStyle = col; for (const [x, y] of [[12, 46], [18, 52], [46, 12], [52, 18]]) { c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); } break;

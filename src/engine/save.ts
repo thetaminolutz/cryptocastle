@@ -28,6 +28,8 @@ export interface SaveData {
   quests?: unknown;
   map?: unknown;
   chapters?: unknown;
+  dungeons?: unknown;
+  bosses?: string[];
   villagers?: Record<string, import('../entities/villagers').NPCSave>;
   shops?: Record<string, import('../game/dialogue').ShopState>;
 }

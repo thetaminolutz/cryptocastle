@@ -20,7 +20,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M8 Villages, NPCs with schedules, dialogue, shops, reputation | ✅ done |
 | M9 Opening, Ashen Stranger, Herald, Tower of the First Rite, character creation | ✅ done |
 | M10 Quests, journal, map, main story chapters 1–4, the Pale Citadel | ✅ done |
-| M11 Remaining enemies, bosses, dungeons, unique items, armour sets | next |
+| M11 Remaining enemies, bosses, dungeons, unique items, armour sets | ✅ done |
+| M12 Herald errands, profile, wish shards, Living Fresco, endings | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -132,6 +133,38 @@ city with white walls, corner towers and a sealed gate, two inns (*The Last
 Thread*, run by **Atropos**, and *The Gilded Spindle*), a smithy, a bank with your
 own vault (24 slots), a chapel, market stalls, a quest board with side quests,
 an arena master (Kallias the Unbowed) and townsfolk with daily lives.
+
+**Enemies, bosses, dungeons and gear (M11):** 41 enemy types across the biomes
+and danger levels (dire and frost wolves, water spirits that rise from lakes,
+armoured orcs, killer sheep, harpies, winged demons, swamp hags, ice golems, sand
+worms, vampire bats, dark knights, cultists, mimics, skeleton archers, goblins
+and shamans, ogres, myconids, crystal crawlers, fire salamanders, yetis, giant
+crabs, barrow wights, gargoyles, giant wasps, bog lurkers, will-o'-wisps…), some
+of them shooting arrows, venom, frost, shadow bolts or fireballs; **12 bosses**
+(the Troll King, the Scorpion Queen in the labyrinth, the Drowned Bishop, the
+Golden Falcon roaming the meadows, the Ash Dragon, the Hollow King, the Bandit
+Lord, the Spider Matriarch, the Kobold King, the Barrow Lich, the Hag Mother, the
+Frost Colossus) with phases, summoned minions, ranged attacks, telegraphed ground
+slams (a red ring — dodge out) and a boss health bar. **Dungeons** are generated
+from the seed (about one per 620 m cell): a pale arch and a ramp lead down to two
+floors of torch-lit rooms and corridors carved into the rock, themed by biome
+(crypts, spider nests, kobold mines, bandit hideouts, troll caves, drowned
+chapels, frozen vaults, ember forges, hag hollows); enemies wake as you enter
+each room, the boss waits in the deepest room with its chest, and a cracked wall
+hides a treasure room you can dig into. Cleared dungeons stay cleared for a week.
+**Gear:** a Gear tab (paper doll) with head, chest, legs, boots, gloves, cloak, two
+rings and an amulet; armour adds defence and is visible on your character (helms,
+crowns, plate with pauldrons, mail, robes, greaves, gauntlets, cloak colours);
+five armour sets with 2- and 4-piece bonuses (Hunter's Leathers, Ironclad,
+Moonsilver, Pale Guard, Ashen Vestments), cosmetic outfits, rings and amulets;
+new weapon kinds (daggers, sabers, long swords, battle axes, war hammers,
+morning stars, claw whips, spears, bows, crossbows with arrows, fire and frost
+wands, round / kite / tower shields) with proper 3D models and aim-assisted
+ranged attacks; random affixes on dropped weapons (Vampiric, Swift, Keen,
+Heavy, of Burning, of Frost…); and **35 unique named items with lore**
+(Whisperfang, The Gravedigger's Spade, Hemera's Lantern, Crown of the Drowned,
+The Last Thread, The Hollow Edge, Falcon Wing…) dropped by bosses and found in
+hidden treasure rooms.
 
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera (tap an enemy to lock on), **Strike/Mine/Chop/Dig** (hold to keep swinging), **Block**,

@@ -26,6 +26,7 @@ export interface ChapterHooks {
   openStash(items: (Stack | null)[]): void;
   openTravelMap(): void;
   pause(p: boolean): void;
+  queenDead(): boolean;
 }
 export interface ChapterSave { stash: (Stack | null)[]; arenaWins: number; }
 
@@ -73,6 +74,7 @@ export class Chapters {
   /** inside the citadel walls, at ground level */
   get citadelPlace() { return `The Pale Citadel@${this.citadel.x},${this.citadel.z}`; }
   inCitadel(p = this.player.pos) { return Math.abs(p.x - this.citadel.x) < CITADEL_HALF - 1 && Math.abs(p.z - this.citadel.z) < CITADEL_HALF - 1 && p.y > this.citadel.y - 2.5; }
+  private queenDead() { return this.hooks.queenDead(); }
   inLabyrinth(p = this.player.pos) { const h = (this.lab.n * LAB.cell) / 2; return Math.abs(p.x - this.lab.cx) < h + 1 && Math.abs(p.z - this.lab.cz) < h + 1 && p.y < this.lab.floor + 5; }
 
   update(dt: number) {
@@ -116,6 +118,15 @@ export class Chapters {
           this.scorpions.push(s);
           break;
         }
+      }
+    }
+    // the Scorpion Queen waits in the labyrinth's far corner
+    if (inLab && !this.queenDead() && !this.creatures.list.some((c) => c.def.id === 'scorpion_queen' && c.state !== 'dead')) {
+      const qc = labCell(this.lab, 0, 0);
+      if (Math.hypot(qc.x - p.x, qc.z - p.z) < 22 && this.world.isLoaded(qc.x, qc.z)) {
+        const q = this.creatures.spawn(ENEMIES.scorpion_queen, V(qc.x, this.lab.floor + 0.1, qc.z), 2, 0);
+        q.state = 'chase'; q.alerted = true;
+        this.hooks.toast('Something vast stirs in the dark. The Scorpion Queen!', '#e08070');
       }
     }
     if (this.inCitadel()) {

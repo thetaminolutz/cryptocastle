@@ -1,12 +1,14 @@
 // The in-game menu: Inventory (drag & drop, long-press info, split), Crafting,
 // Settings and Save. Touch-first; also works with a mouse.
-import { Inventory, HOTBAR, BACKPACK, Stack } from '../game/inventory';
+import { Inventory, HOTBAR, BACKPACK, Stack, stackName } from '../game/inventory';
+import { EQUIP_SLOTS, SLOT_NAME, SETS, AFFIXES, Bonus } from '../data/gear';
+import { gearTotals } from '../game/equipment';
 import { ITEMS, RARITY_COLOR, Recipe, Station } from '../data/items';
 import { iconUrl } from './icons';
 import { slotHTML } from './hotbar';
 import { buildSettings } from './settings-panel';
 
-export type MenuTab = 'inventory' | 'crafting' | 'map' | 'journal' | 'settings' | 'save' | 'chest';
+export type MenuTab = 'inventory' | 'gear' | 'crafting' | 'map' | 'journal' | 'settings' | 'save' | 'chest';
 export interface MenuHooks {
   stations(): Set<Station>;
   save(): Promise<void>;
@@ -27,7 +29,7 @@ export class Menu {
   private chest: (Stack | null)[] | null = null;
 
   constructor(private parent: HTMLElement, private inv: Inventory, private hooks: MenuHooks) {
-    inv.onChange(() => { if (this.root && (this.tab === 'inventory' || this.tab === 'crafting')) this.renderTab(); });
+    inv.onChange(() => { if (this.root && (this.tab === 'inventory' || this.tab === 'crafting' || this.tab === 'gear')) this.renderTab(); });
   }
 
   get isOpen() { return !!this.root; }
@@ -42,7 +44,7 @@ export class Menu {
     const tabs = document.createElement('div');
     tabs.className = 'tabs';
     if (tab !== 'chest') this.chest = null;
-    const tabList: [MenuTab, string][] = [['inventory', 'Pack'], ['crafting', 'Craft'], ['map', 'Map'], ['journal', 'Journal'], ['settings', 'Settings'], ['save', 'Save']];
+    const tabList: [MenuTab, string][] = [['inventory', 'Pack'], ['gear', 'Gear'], ['crafting', 'Craft'], ['map', 'Map'], ['journal', 'Journal'], ['settings', 'Settings'], ['save', 'Save']];
     if (this.chest) tabList.unshift(['chest', 'Chest']);
     for (const [t, label] of tabList) {
       const b = document.createElement('button');
@@ -77,6 +79,7 @@ export class Menu {
     b.innerHTML = '';
     if (this.tab === 'chest' && this.chest) this.renderChest(b, this.chest);
     else if (this.tab === 'inventory') this.renderInventory(b);
+    else if (this.tab === 'gear') this.renderGear(b);
     else if (this.tab === 'crafting') this.renderCrafting(b);
     else if (this.tab === 'map') this.hooks.renderMap(b);
     else if (this.tab === 'journal') this.hooks.renderJournal(b);
@@ -147,21 +150,65 @@ export class Menu {
     const s = this.inv.slots[this.infoSlot];
     if (!s) { box.innerHTML = '<p>Tap an item to inspect it. Drag items to move them; drop on the belt to use them.</p>'; return; }
     const d = ITEMS[s.id];
-    const h = document.createElement('h3'); h.textContent = d.name; h.style.color = RARITY_COLOR[d.rarity ?? 'common'];
+    const h = document.createElement('h3'); h.textContent = stackName(s); h.style.color = RARITY_COLOR[d.rarity ?? 'common'];
     const p = document.createElement('p'); p.textContent = d.desc;
     box.append(h, p);
     const stat = (t: string) => { const e = document.createElement('div'); e.className = 'stat'; e.textContent = t; box.appendChild(e); };
-    stat(`${(d.rarity ?? 'common').toUpperCase()} · ${d.cat}`);
+    describeStats(d, s, stat);
+    if (d.lore) { const l = document.createElement('p'); l.className = 'lore'; l.textContent = `“${d.lore}”`; box.appendChild(l); }
     if (d.tool && d.tool.kind !== 'staff' && d.tool.kind !== 'torch') stat(`Tier ${d.tool.tier} · Power ${d.tool.power}${s.dur !== undefined ? ` · Durability ${Math.ceil(s.dur)}/${d.tool.durability}` : ''}`);
     if (d.food) stat(`Restores ${d.food.heal} life${d.food.stamina ? `, ${d.food.stamina} stamina` : ''}`);
     if (s.n > 1) stat(`Stack: ${s.n}`);
     const btn = (label: string, fn: () => void) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = label; b.addEventListener('click', fn); box.appendChild(b); };
+    if (d.armor) btn('Wear', () => { this.inv.equipFrom(this.infoSlot); });
     if (s.n > 1) btn('Split', () => this.inv.split(this.infoSlot));
     if (this.infoSlot >= HOTBAR) btn('To belt', () => {
       const free = this.inv.slots.findIndex((x, k) => k < HOTBAR && !x);
       this.inv.move(this.infoSlot, free >= 0 ? free : this.inv.selected);
     });
     btn('Discard', () => { this.inv.slots[this.infoSlot] = null; this.inv.changed(); });
+  }
+
+  // ---------------------------------------------------------------- equipment (paper doll)
+  private renderGear(b: HTMLElement) {
+    const wrap = document.createElement('div'); wrap.className = 'inv-wrap';
+    const left = document.createElement('div');
+    const doll = document.createElement('div'); doll.className = 'doll';
+    for (const k of EQUIP_SLOTS) {
+      const cell = document.createElement('div'); cell.className = 'doll-cell';
+      const el = document.createElement('div'); el.className = 'slot';
+      slotHTML(el, this.inv.equip[k] ?? null);
+      const lab = document.createElement('span'); lab.textContent = SLOT_NAME[k];
+      el.addEventListener('click', () => { if (this.inv.equip[k] && !this.inv.unequip(k)) alert('Your pack is full.'); });
+      cell.append(el, lab); doll.appendChild(cell);
+    }
+    const l = document.createElement('div'); l.className = 'inv-label'; l.textContent = 'WORN — tap to take off';
+    const l2 = document.createElement('div'); l2.className = 'inv-label'; l2.textContent = 'IN YOUR PACK — tap to wear';
+    const g = document.createElement('div'); g.className = 'inv-grid';
+    this.inv.slots.forEach((st, i) => {
+      if (!st || !ITEMS[st.id].armor) return;
+      const el = document.createElement('div'); el.className = 'slot'; slotHTML(el, st);
+      el.addEventListener('click', () => this.inv.equipFrom(i));
+      g.appendChild(el);
+    });
+    if (!g.children.length) g.innerHTML = '<p class="muted">No clothing or armour in your pack.</p>';
+    left.append(l, doll, l2, g);
+    // totals
+    const info = document.createElement('div'); info.className = 'info';
+    const t = gearTotals(this.inv);
+    const h = document.createElement('h3'); h.textContent = `Defence ${t.def}`;
+    info.appendChild(h);
+    const lines = bonusLines(t.bonus);
+    for (const line of lines) { const e = document.createElement('div'); e.className = 'stat'; e.textContent = line; info.appendChild(e); }
+    for (const st of t.sets) {
+      const set = Object.values(SETS).find((x) => x.name === st.name)!;
+      const e = document.createElement('div'); e.className = 'stat set';
+      e.innerHTML = `<b>${set.name}</b> ${st.n}/${st.total}<br><span class="${st.n >= 2 ? 'on' : ''}">(2) ${bonusLines(set.two).join(', ')}</span><br><span class="${st.n >= 4 ? 'on' : ''}">(4) ${bonusLines(set.four).join(', ')}</span>`;
+      info.appendChild(e);
+    }
+    if (!lines.length && !t.sets.length) info.insertAdjacentHTML('beforeend', '<p>Wear armour and jewellery to raise your defence and gain bonuses. Pieces of the same set work together.</p>');
+    wrap.append(left, info);
+    b.appendChild(wrap);
   }
 
   /** Open a storage container (chest). Tap an item to move its stack across. */
@@ -248,4 +295,30 @@ export class Menu {
     msg.textContent = 'The game also saves by itself every two minutes and whenever you leave the app.';
     b.append(row, msg);
   }
+}
+
+const PCT = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v * 100)}%`;
+/** Human-readable bonus lines. */
+export function bonusLines(b: Bonus): string[] {
+  const out: string[] = [];
+  const add = (v: number | undefined, f: (v: number) => string) => { if (v) out.push(f(v)); };
+  add(b.life, (v) => `${v > 0 ? '+' : ''}${v} life`); add(b.stamina, (v) => `+${v} stamina`); add(b.def, (v) => `+${v} defence`);
+  add(b.dmg, (v) => `${PCT(v)} damage`); add(b.crit, (v) => `${PCT(v)} critical chance`); add(b.lifesteal, (v) => `${PCT(v)} life steal`);
+  add(b.fire, (v) => `${PCT(v)} chance to burn`); add(b.frost, (v) => `${PCT(v)} chance to freeze`); add(b.curse, (v) => `${PCT(v)} chance to curse`);
+  add(b.speed, (v) => `${PCT(v)} speed`); add(b.jump, (v) => `${PCT(v)} jump`); add(b.regen, (v) => `+${v} life regeneration`);
+  add(b.staminaRegen, (v) => `${PCT(v)} stamina recovery`); add(b.block, (v) => `${PCT(v)} block`); add(b.attackSpeed, (v) => `${PCT(v)} attack speed`);
+  add(b.ranged, (v) => `${PCT(v)} ranged damage`); add(b.xp, (v) => `${PCT(v)} experience`); add(b.gold, (v) => `${PCT(v)} gold found`);
+  add(b.breath, (v) => `${PCT(v)} breath`); add(b.fireRes, (v) => `${PCT(v)} fire resistance`); if (b.poisonRes) out.push('Immune to poison');
+  if (b.nightEye) out.push('See in the dark'); if (b.light) out.push('Carries its own light'); if (b.stealth) out.push('Harder to notice');
+  return out;
+}
+
+function describeStats(d: import('../data/items').ItemDef, s: Stack, stat: (t: string) => void) {
+  stat(`${(d.rarity ?? 'common').toUpperCase()} · ${d.cat === 'armor' ? SLOT_NAME[(d.armor!.slot === 'ring' ? 'ring1' : d.armor!.slot) as keyof typeof SLOT_NAME] : d.cat}`);
+  if (d.weapon) stat(`${Math.round(d.weapon.dmg)} ${d.weapon.type} damage · speed ${d.weapon.speed} · ${d.weapon.ranged ? `range ${d.weapon.reach} m${d.weapon.ranged.ammo ? ' · uses arrows' : ''}` : `reach ${d.weapon.reach} m`}`);
+  if (d.shield) stat(`Blocks ${Math.round(d.shield.block * 100)}% of a blow`);
+  if (d.armor) stat(`Defence ${d.armor.def}${d.armor.set ? ` · ${SETS[d.armor.set].name} set` : ''}`);
+  for (const l of bonusLines(d.bonus ?? {})) stat(l);
+  if (s.affix) for (const l of bonusLines(AFFIXES[s.affix].bonus)) stat(l);
+  if (s.affix && AFFIXES[s.affix].dmgMul) stat(`${PCT(AFFIXES[s.affix].dmgMul! - 1)} damage, ${PCT(AFFIXES[s.affix].speedMul! - 1)} speed`);
 }

@@ -9,6 +9,7 @@ import { Simplex, hash3 } from './noise';
 import { B } from './blocks';
 import { CHUNK_HEIGHT, CHUNK_SIZE, SEA_LEVEL } from './constants';
 import { Biome, BIOMES, CLIMATE_BIOMES, Plant } from './biomes';
+import { dungeonForCell, dungeonDist, Dungeon, DUNGEON_CELL } from './dungeons';
 import { villageAt, flattenWeight, isVillageHeightOk, VillageSite, citadelSite, labyrinthOf, labyrinthDist, Labyrinth } from './villages';
 import { SPRING, GORGE, TOWER, CAMPFIRE, GRAVEYARD, CITADEL_HALF, LAB } from '../data/story';
 
@@ -157,6 +158,26 @@ export class TerrainGen {
   private towerH: number | null = null;
   private graveH: number | null = null;
   private lab: Labyrinth | null = null;
+  private dgRaw = (x: number, z: number) => { const c = this.rawColumn(x, z); return { height: c.height, ok: true, biome: c.biome }; };
+  /** The dungeon whose area contains (x, z), if any. */
+  dungeonAt(x: number, z: number): Dungeon | null {
+    const cx = Math.floor(x / DUNGEON_CELL), cz = Math.floor(z / DUNGEON_CELL);
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      const d = dungeonForCell(cx + i, cz + j, this.seed, this.dgRaw);
+      if (d && x > d.minX && x < d.maxX && z > d.minZ && z < d.maxZ) return d;
+    }
+    return null;
+  }
+  /** Dungeons within range of a point. */
+  dungeonsNear(x: number, z: number, r: number): Dungeon[] {
+    const out: Dungeon[] = [];
+    const cx = Math.floor(x / DUNGEON_CELL), cz = Math.floor(z / DUNGEON_CELL);
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      const d = dungeonForCell(cx + i, cz + j, this.seed, this.dgRaw);
+      if (d && Math.hypot(d.x - x, d.z - z) < r) out.push(d);
+    }
+    return out;
+  }
   /** The Pale Citadel's site (fixed per seed). */
   citadel(): VillageSite { return citadelSite(this.seed, this.rawFn); }
   /** The scorpion labyrinth beneath the citadel. */
@@ -263,6 +284,7 @@ export class TerrainGen {
     const inLab = Math.abs(wx - L.cx) < half + 8 && wz > L.cz - half - 8 && wz < L.cz + half + 64;
     const inCit = Math.abs(wx - L.cx) < CITADEL_HALF && Math.abs(wz - L.cz) < CITADEL_HALF;
     if (inCit && !steep) top = B.GRAVEL;
+    const dg = this.dungeonAt(wx, wz);
     const yMax = Math.min(CHUNK_HEIGHT - 1, Math.ceil(Math.max(h, col.liquidLevel)) + 6 + (col.floating > 0.2 ? 50 : 0));
     let localDepth = -1; // metres below the nearest surface above (handles islands/overhangs)
     for (let y = yMax; y >= 0; y--) {
@@ -277,6 +299,10 @@ export class TerrainGen {
         const protect = Math.max(0, 7 - d) * 1.5 * (1 - entrance);
         const cave = (a * a + c * c - r) * 140 + protect;
         if (cave < d) d = cave;
+      }
+      if (dg && y > dg.minY && y < dg.surface + 4) {
+        const dd = dungeonDist(dg, wx, y, wz);
+        if (dd < d) d = dd;
       }
       if (inLab && y > L.floor - 3) {
         const ld = labyrinthDist(L, wx, y, wz);

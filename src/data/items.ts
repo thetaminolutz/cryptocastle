@@ -1,16 +1,18 @@
 // Item, tool and recipe tables (data). Add new content here.
 import { B } from '../world/blocks';
 import { Plant, Tree } from '../world/biomes';
+import { GEAR, type ArmorDef, type Bonus } from './gear';
 
 export type Rarity = 'common' | 'fine' | 'rare' | 'epic' | 'legendary' | 'cursed';
 export const RARITY_COLOR: Record<Rarity, string> = {
   common: '#b8b0a0', fine: '#5fbf5a', rare: '#4f8fe8', epic: '#a65ee0', legendary: '#e8b030', cursed: '#e0343c'
 };
 
-export type ToolKind = 'pickaxe' | 'axe' | 'shovel' | 'sickle' | 'knife' | 'staff' | 'torch' | 'sword' | 'spear' | 'mace' | 'club';
+export type ToolKind = 'pickaxe' | 'axe' | 'shovel' | 'sickle' | 'knife' | 'staff' | 'torch' | 'sword' | 'spear' | 'mace' | 'club'
+  | 'dagger' | 'saber' | 'longsword' | 'hammer' | 'morningstar' | 'whip' | 'bow' | 'crossbow' | 'wand';
 export type DmgType = 'slash' | 'pierce' | 'blunt' | 'fire' | 'ice' | 'poison' | 'holy' | 'shadow';
-export interface WeaponStats { dmg: number; type: DmgType; reach: number; speed: number; stamina: number; }
-export type Category = 'material' | 'tool' | 'food' | 'placeable' | 'misc' | 'weapon' | 'shield';
+export interface WeaponStats { dmg: number; type: DmgType; reach: number; speed: number; stamina: number; /** bows, crossbows, wands: projectile speed and ammo */ ranged?: { speed: number; ammo?: string }; }
+export type Category = 'material' | 'tool' | 'food' | 'placeable' | 'misc' | 'weapon' | 'shield' | 'armor';
 export type Station = 'hand' | 'workbench' | 'campfire' | 'furnace' | 'anvil';
 
 export interface ItemDef {
@@ -23,10 +25,17 @@ export interface ItemDef {
   shield?: { block: number };
   place?: string; // placeable prop id
   value?: number; // base price (economy, M8)
+  /** wearable: slot, defence, set, look */
+  armor?: ArmorDef;
+  /** stat bonuses while held (weapons/shields) or worn */
+  bonus?: Bonus;
+  /** unique items: a line of lore */
+  lore?: string;
 }
 export type IconShape = 'log' | 'plank' | 'stick' | 'stone' | 'ore' | 'bar' | 'gem' | 'fiber' | 'rope' | 'berry' | 'mushroom' | 'flower'
   | 'leaf' | 'pickaxe' | 'axe' | 'shovel' | 'sickle' | 'knife' | 'staff' | 'torch' | 'campfire' | 'bench' | 'furnace' | 'anvil'
-  | 'sand' | 'clump' | 'meal' | 'potion' | 'glass' | 'brick' | 'coal' | 'shard' | 'flint' | 'sword' | 'spear' | 'mace' | 'club' | 'shield' | 'meat' | 'hide' | 'bone' | 'fang' | 'coin';
+  | 'sand' | 'clump' | 'meal' | 'potion' | 'glass' | 'brick' | 'coal' | 'shard' | 'flint' | 'sword' | 'spear' | 'mace' | 'club' | 'shield' | 'meat' | 'hide' | 'bone' | 'fang' | 'coin'
+  | 'dagger' | 'saber' | 'longsword' | 'hammer' | 'whip' | 'bow' | 'crossbow' | 'wand' | 'head' | 'chest' | 'legs' | 'boots' | 'gloves' | 'cloak' | 'ring' | 'amulet';
 
 const I = (d: ItemDef) => d;
 export const ITEMS: Record<string, ItemDef> = {};
@@ -114,6 +123,7 @@ add(
   I({ id: 'wooden_shield', name: 'Wooden Shield', cat: 'shield', stack: 1, desc: 'Keep it on your belt to raise it when you block.', icon: { shape: 'shield', color: '#8a6a42' }, shield: { block: 0.75 }, value: 6 }),
   I({ id: 'iron_shield', name: 'Iron Shield', cat: 'shield', stack: 1, rarity: 'fine', desc: 'A heater shield rimmed with iron.', icon: { shape: 'shield', color: '#a0a0a8' }, shield: { block: 0.88 }, value: 40 })
 );
+add(...GEAR);
 // ---- creature loot & remedies
 add(
   I({ id: 'raw_meat', name: 'Raw Meat', cat: 'food', desc: 'Cook it first if you value your stomach.', icon: { shape: 'meat', color: '#b03a3a' }, food: { heal: 2 }, value: 2 }),
@@ -186,6 +196,28 @@ export const RECIPES: Recipe[] = [
 ];
 // copper tools can also be made at a workbench before you own an anvil
 RECIPES.push(R('copper_pickaxe', 1, 'workbench', ['copper_bar', 4], ['stick', 2]));
+// ---- weapons and armour (M11)
+RECIPES.push(
+  R('arrow', 8, 'workbench', ['stick', 4], ['flint', 2], ['fiber', 2]),
+  R('hunting_bow', 1, 'workbench', ['log', 1], ['rope', 2]),
+  R('round_shield', 1, 'workbench', ['planks', 3], ['leather', 1]),
+  R('spiked_club', 1, 'workbench', ['log', 1], ['fang', 3]),
+  R('leather_cap', 1, 'workbench', ['leather', 2], ['fiber', 2]), R('leather_jerkin', 1, 'workbench', ['leather', 5], ['fiber', 4]),
+  R('leather_breeches', 1, 'workbench', ['leather', 4], ['fiber', 3]), R('leather_boots', 1, 'workbench', ['leather', 2], ['fiber', 2]),
+  R('leather_gloves', 1, 'workbench', ['leather', 1], ['fiber', 2]), R('travel_cloak', 1, 'workbench', ['fiber', 12], ['leather', 1]),
+  R('iron_dagger', 1, 'anvil', ['iron_bar', 1], ['leather', 1]), R('iron_spear', 1, 'anvil', ['iron_bar', 2], ['stick', 2]),
+  R('saber', 1, 'anvil', ['iron_bar', 3], ['leather', 1]), R('long_sword', 1, 'anvil', ['iron_bar', 4], ['leather', 1]),
+  R('battle_axe', 1, 'anvil', ['iron_bar', 4], ['log', 1]), R('war_hammer', 1, 'anvil', ['iron_bar', 5], ['log', 1]),
+  R('morning_star', 1, 'anvil', ['iron_bar', 4], ['stick', 2]), R('kite_shield', 1, 'anvil', ['iron_bar', 3], ['planks', 3], ['leather', 1]),
+  R('crossbow', 1, 'anvil', ['iron_bar', 2], ['planks', 3], ['rope', 2]), R('long_bow', 1, 'workbench', ['pine_log', 2], ['rope', 3], ['leather', 1]),
+  R('iron_helm', 1, 'anvil', ['iron_bar', 3]), R('iron_cuirass', 1, 'anvil', ['iron_bar', 7], ['leather', 2]),
+  R('iron_greaves', 1, 'anvil', ['iron_bar', 5], ['leather', 1]), R('iron_sabatons', 1, 'anvil', ['iron_bar', 3]),
+  R('iron_gauntlets', 1, 'anvil', ['iron_bar', 2], ['leather', 1]), R('iron_ring', 1, 'anvil', ['iron_bar', 1]),
+  R('silver_ring', 1, 'anvil', ['silver_bar', 1]),
+  R('mithril_circlet', 1, 'anvil', ['mithril_bar', 2], ['moonstone', 1]), R('mithril_mail', 1, 'anvil', ['mithril_bar', 6], ['leather', 2]),
+  R('mithril_leggings', 1, 'anvil', ['mithril_bar', 4], ['leather', 1]), R('mithril_boots', 1, 'anvil', ['mithril_bar', 3]),
+  R('mithril_gloves', 1, 'anvil', ['mithril_bar', 2], ['leather', 1])
+);
 
 // ---- gathering tables
 /** Terrain material → [item, chance per dug grid point, required tool tier, soft (shovel-friendly)] */

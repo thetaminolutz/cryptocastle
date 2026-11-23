@@ -1,5 +1,6 @@
 // Owns the scene, world streaming, sky, weather, wildlife, player, camera and the loop.
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Renderer } from '../engine/renderer';
 import { FrameStats } from '../engine/fps';
 import { input } from '../engine/input';
@@ -16,7 +17,7 @@ import { CHUNK_SIZE, SEA_LEVEL } from '../world/constants';
 import { TerrainGen } from '../world/terrain';
 import { BIOMES, Biome } from '../world/biomes';
 import { Player } from '../entities/player';
-import { HeroModel } from '../entities/hero';
+import { HeroModel, METAL_ENV } from '../entities/hero';
 import { CameraRig } from '../entities/camera-rig';
 import { Wildlife } from '../entities/animals';
 import { Hud } from '../ui/hud';
@@ -45,6 +46,9 @@ import { QuestLog, QuestSave } from './quests';
 import { Chapters, ChapterSave } from './chapters';
 import { WorldMap, MapSave, MapMarker } from '../ui/map';
 import { renderJournal } from '../ui/journal';
+import { Projectiles } from './projectiles';
+import { gearTotals, wornLook } from './equipment';
+import { Delves, DelveState } from './delves';
 
 const SPAWN = { x: 0.5, z: 0.5 };
 
@@ -106,6 +110,10 @@ export class Game {
   readonly chapters: Chapters;
   readonly map: WorldMap;
   private travelMode = false;
+  readonly projectiles: Projectiles;
+  private gearKey = '';
+  readonly bossesDefeated = new Set<string>();
+  readonly delves: Delves;
   private questTimer = 0;
   traits!: Traits;
   private creating = false;
@@ -122,13 +130,29 @@ export class Game {
     this.props = new Props(this.shadows);
     this.building = new Building(this.shadows);
     this.wildlife.isSafe = (p) => this.building.isSafe(p);
-    this.creatures = new Creatures(this.world, this.gen, this.building, this.shadows, { strike: () => {}, toast: (t, c) => this.hotbar.notify(t, c) });
+    this.creatures = new Creatures(this.world, this.gen, this.building, this.shadows, {
+      strike: () => {}, toast: (t, c) => this.hotbar.notify(t, c),
+      shoot: (c) => this.enemyShoot(c),
+      slam: (c, radius, dmg, type) => {
+        this.shake = Math.max(this.shake, 0.5);
+        audio.impact(true);
+        const p = this.player.pos;
+        if (Math.hypot(p.x - c.pos.x, p.z - c.pos.z) < radius && p.y < c.pos.y + 2.5) {
+          const from = c.pos.clone().sub(p).setY(0).normalize().add(p);
+          this.combat.hitPlayer(from, dmg, type, ['stun', 0.5], c.def.name);
+        }
+      }
+    });
     this.lostMarker = new THREE.Mesh(new THREE.OctahedronGeometry(0.25, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.5, 2.2, 1.2) }));
     this.lostMarker.visible = false;
     this.villagers = new Villagers(ui, this.world, this.gen, this.building, this.shadows, this.creatures);
     this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi, this.props.group, this.building.group, this.creatures.group, this.lostMarker, this.villagers.group);
     this.shadows.add(this.model.root);
     this.scene.fog = this.fog;
+    // a soft environment for metal and gloss on the hero, weapons and shields
+    const pmrem = new THREE.PMREMGenerator(this.renderer.gl);
+    METAL_ENV.tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
     this.applySettings();
     settings.onChange((_s, k) => { if (['viewDistance', 'shadows', 'vegetation', 'particles'].includes(k)) this.applySettings(); });
 
@@ -159,7 +183,7 @@ export class Game {
       setAttack: (l) => this.touch.setLabel('attack', l),
       toast: (t, c) => this.hotbar.notify(t, c),
       openCrafting: () => { this.setPaused(true); this.menu.open('crafting'); },
-      special: (p) => { if (!this.chapters.special(p)) this.story.useSpecial(p); },
+      special: (p) => { if (!this.chapters.special(p) && !this.delves.openChest(p)) this.story.useSpecial(p); },
       openChest: (p) => { if (p.gen) { this.hotbar.notify('This chest belongs to someone else.', '#e08070'); return; } if (p.items) { this.setPaused(true); this.menu.openChest(p.items); } },
       sleep: (p) => {
         if (p.gen && !(this.rentedBed && Math.hypot(this.rentedBed.x - p.x, this.rentedBed.z - p.z) < 1.5)) { this.hotbar.notify('This bed is not yours. Rent a room from the innkeeper.', '#e08070'); return; }
@@ -183,6 +207,14 @@ export class Game {
       onLevel: (lv) => { this.hotbar.notify(`You're a ${levelWord(lv)} now.`, '#f0d070'); audio.parry(); }
     });
     this.interaction.combat = this.combat;
+    this.projectiles = new Projectiles(this.world, this.creatures, this.player, {
+      hitCreature: (c, dmg, type, from) => this.combat.projectileHit(c, dmg, type, from),
+      hitPlayer: (from, dmg, type, status, name) => this.combat.hitPlayer(from, dmg, type, status, name),
+      burst: () => {}
+    });
+    this.combat.shoot = (from, dir, speed, dmg, type, kind) => this.projectiles.fire(kind, from, dir, speed, dmg, type, { fromPlayer: true });
+    this.scene.add(this.projectiles.group);
+    this.inventory.onChange(() => this.onGearChange());
     this.interaction.creatures = this.creatures;
     this.interaction.wildlife = this.wildlife;
     this.dialogue = new Dialogue(ui, this.inventory, this.villagers, {
@@ -235,9 +267,14 @@ export class Game {
       give: (id, n) => { const left = this.inventory.add(id, n); if (left) this.hotbar.notify('Your pack is full.', '#e08070'); },
       openStash: (items) => { this.setPaused(true); this.menu.openChest(items); },
       openTravelMap: () => { this.travelMode = true; this.setPaused(true); this.menu.open('map'); },
-      pause: (p) => this.setPaused(p)
+      pause: (p) => this.setPaused(p),
+      queenDead: () => this.bossesDefeated.has('scorpion_queen')
     });
-    this.creatures.onDeath = (c) => this.quests.onKill(c.def.id, c.pos);
+    this.delves = new Delves(this.gen, this.world, this.building, this.player, this.creatures, this.map, this.inventory, {
+      toast: (t, c) => this.hotbar.notify(t, c), addGold: (n) => { this.gold += Math.round(n * this.combat.perks.gold); },
+      day: () => this.sky.day, bossDead: () => false
+    });
+    this.creatures.onDeath = (c) => { this.quests.onKill(c.def.id, c.pos); if (c.def.boss) this.bossDefeated(c); };
     this.story = new Story(ui, this.world, this.building, this.player, this.creatures, this.props, {
       toast: (t, c) => this.hotbar.notify(t, c),
       objective: (t, at) => this.hud.setObjective(t, at, this.player.pos, this.rig.yaw),
@@ -282,6 +319,8 @@ export class Game {
       this.quests.load(d.quests as QuestSave | undefined);
       this.map.load(d.map as MapSave | undefined);
       this.chapters.load(d.chapters as ChapterSave | undefined);
+      this.delves.load(d.dungeons as Record<string, DelveState> | undefined);
+      for (const b of d.bosses ?? []) this.bossesDefeated.add(b);
       if (!d.quests) { // saves from before the quest log
         this.quests.start('ch1', true);
         if (this.story.step === 'free') for (const f of ['met_stranger', 'met_herald', 'rite_done']) this.quests.flag(f);
@@ -339,7 +378,9 @@ export class Game {
       story: this.story.serialize(),
       quests: this.quests.serialize(),
       map: this.map.serialize(),
-      chapters: this.chapters.serialize()
+      chapters: this.chapters.serialize(),
+      dungeons: this.delves.serialize(),
+      bosses: [...this.bossesDefeated]
     };
   }
 
@@ -389,6 +430,33 @@ export class Game {
     }), 1200);
   }
 
+  /** A boss falls: a unique from its hoard (one you do not have yet, if possible). */
+  private bossDefeated(c: import('../entities/creatures').Creature) {
+    const drops = c.def.boss!.drops;
+    const owned = (id: string) => this.inventory.count(id) > 0 || Object.values(this.inventory.equip).some((s) => s?.id === id);
+    const fresh = drops.filter((d) => !owned(d));
+    const pick = (fresh.length ? fresh : drops)[Math.floor(Math.random() * (fresh.length || drops.length))];
+    const st = { id: pick, n: 1, dur: ITEMS[pick].tool?.durability || undefined };
+    if (this.inventory.addStack(st)) this.hotbar.notify(`${c.def.name} is defeated! You claim ${ITEMS[pick].name}.`, '#e8b030');
+    else this.hotbar.notify(`${c.def.name} is defeated! ${ITEMS[pick].name} lies on the ground — your pack is full.`, '#e8b030');
+    audio.parry();
+    this.combat.gainXp(0);
+    this.bossesDefeated.add(c.def.id);
+  }
+
+  /** An enemy releases its ranged attack: aim at the player with a little lead. */
+  private enemyShoot(c: import('../entities/creatures').Creature) {
+    const r = c.def.ranged; if (!r) return;
+    const from = c.pos.clone().setY(c.pos.y + c.hover + c.def.height * (c.def.scale ?? 1) * 0.7);
+    const target = this.player.pos.clone().setY(this.player.pos.y + 1.1);
+    const t = from.distanceTo(target) / r.speed;
+    target.addScaledVector(this.player.vel, t * 0.6);
+    if (r.kind === 'arrow') target.y += 0.5 * 9 * t * t;
+    const dir = target.sub(from).normalize();
+    const type = r.kind === 'fireball' ? 'fire' : r.kind === 'frost' ? 'ice' : r.kind === 'shadow' ? 'shadow' : r.kind === 'spit' ? 'poison' : r.kind === 'arrow' ? 'pierce' : c.def.dmgType;
+    this.projectiles.fire(r.kind, from, dir, r.speed, c.def.dmg * c.dmgMul * (r.dmgMul ?? 1), type, { fromPlayer: false, owner: c, status: c.def.onHit, name: c.def.name, splash: r.splash });
+  }
+
   /** Markers for the world map. */
   private mapMarkers(): MapMarker[] {
     const p = this.player.pos;
@@ -397,7 +465,7 @@ export class Game {
     if (home) out.push({ x: home.x, z: home.z, kind: 'home', label: 'Home' });
     out.push({ x: TOWER.x, z: TOWER.z, kind: 'landmark', label: 'The Tower' });
     const parse = (s: string) => { const [name, xz] = s.split('@'); const [x, z] = xz.split(',').map(Number); return { name, x, z }; };
-    for (const s of this.map.places) { const q = parse(s); out.push({ x: q.x, z: q.z, kind: q.name === 'The Pale Citadel' ? 'citadel' : 'village', label: q.name }); }
+    for (const s of this.map.places) { const dg = s.startsWith('dg:'); const q = parse(dg ? s.slice(3) : s); out.push({ x: q.x, z: q.z, kind: dg ? 'dungeon' : q.name === 'The Pale Citadel' ? 'citadel' : 'village', label: q.name }); }
     if (this.quests.get('ch2')) out.push({ x: GRAVEYARD.x, z: GRAVEYARD.z, kind: 'landmark', label: 'Barrow Cemetery' });
     if (this.quests.get('ch3')) { const e = this.chapters.labEntrance; out.push({ x: e.x, z: e.z, kind: 'landmark', label: 'Labyrinth' }); out.push({ x: this.chapters.citadel.x, z: this.chapters.citadel.z, kind: 'citadel', label: 'The Pale Citadel' }); }
     for (const w of this.map.waystones) { const q = parse(w); out.push({ x: q.x, z: q.z, kind: 'waystone', label: q.name, id: w }); }
@@ -424,9 +492,18 @@ export class Game {
   }
 
   /** Re-derive stats and perks from the character profile. */
+  /** Equipment or held item changed: stats and (if worn pieces changed) the hero's look. */
+  private onGearChange() {
+    if (!this.story) return;
+    this.applyProfile();
+    const key = JSON.stringify(this.inventory.equip);
+    if (key !== this.gearKey) { this.gearKey = key; this.model.setGear(wornLook(this.inventory)); }
+  }
+
   applyProfile() {
-    this.traits = applyProfile(this.story.profile, this.player, this.combat, this.interaction, this.combat.level);
+    this.traits = applyProfile(this.story.profile, this.player, this.combat, this.interaction, this.combat.level, gearTotals(this.inventory));
     U.uNightEye.value = this.traits.nightEye ? 1 : 0;
+    this.interaction.carriedLight = this.traits.light;
   }
 
   /** The end of the First Rite: fade, the new face, morning outside the tower. */
@@ -539,7 +616,9 @@ export class Game {
       this.villagers.update(dt, this.player.pos, this.sky.hours, cam);
       this.villagers.tickDoors(dt);
       this.story.update(dt, this.elapsed);
+      this.projectiles.update(dt);
       this.chapters.update(dt);
+      this.delves.update(dt);
       this.questTimer -= dt;
       if (this.questTimer <= 0) {
         this.questTimer = 0.5;
@@ -601,6 +680,8 @@ export class Game {
     if (t && 'def' in t && t.state !== 'dead' && t.pos.distanceTo(this.player.pos) < 30) this.hud.setTarget(t.def.name, t.hp / t.maxHp, t.elite);
     else if (t && !('def' in t) && !t.dead && t.pos.distanceTo(this.player.pos) < 30) this.hud.setTarget('Wild animal', t.hp / t.maxHp);
     else this.hud.setTarget(null);
+    const boss = this.creatures.list.find((c) => c.def.boss && c.state !== 'dead' && c.alerted && c.pos.distanceTo(this.player.pos) < 50);
+    if (boss) this.hud.setBoss(boss.def.name, boss.def.boss!.title, boss.hp / boss.maxHp); else this.hud.setBoss(null);
     if (lock) {
       const v = lock.pos.clone().setY(lock.pos.y + lock.hover + lock.def.height * 0.6).project(cam);
       Object.assign(this.hud.lockMark.style, { display: v.z < 1 ? 'block' : 'none', left: `${(v.x * 0.5 + 0.5) * innerWidth}px`, top: `${(-v.y * 0.5 + 0.5) * innerHeight}px` });
@@ -634,6 +715,7 @@ export class Game {
     this.sunLight.color.copy(U.uLightColor.value); this.sunLight.intensity = PI;
     this.hemi.color.copy(U.uSkyAmb.value); this.hemi.groundColor.copy(U.uGroundAmb.value); this.hemi.intensity = PI;
     this.fog.color.copy(U.uFogColor.value);
+    if (METAL_ENV.tex) this.model.setMetalEnv(METAL_ENV.tex, (under ? 0.05 : 0.1) + 0.45 * (1 - U.uNight.value));
     this.fog.near = under ? 0 : U.uFogNear.value * 0.6; this.fog.far = under ? 26 : U.uFogFar.value;
   }
 

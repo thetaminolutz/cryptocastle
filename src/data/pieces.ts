@@ -6,7 +6,7 @@ export const WALL_H = 2.4;
 
 export type Snap = 'cell' | 'edge' | 'corner' | 'free';
 export type PieceCat = 'structure' | 'furniture' | 'light';
-export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim' | 'tablet' | 'rite' | 'gate' | 'board' | 'waystone' | 'stash' | 'hoard';
+export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim' | 'tablet' | 'rite' | 'gate' | 'board' | 'waystone' | 'stash' | 'hoard' | 'loot';
 
 /** Local axis-aligned collision box: [minX, minY, minZ, maxX, maxY, maxZ] (rot 0, facing -Z). */
 export type Box = [number, number, number, number, number, number];
@@ -92,6 +92,9 @@ P({ id: 'stash', name: 'Bank Vault', cat: 'furniture', snap: 'free', cost: [], b
 P({ id: 'gravestone', name: 'Gravestone', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.35, 0, -0.1, 0.35, 0.9, 0.1]], top: 0.9, icon: 'claim', hidden: true });
 P({ id: 'grave_pit', name: 'Open Grave', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'carpet', hidden: true });
 P({ id: 'hoard_chest', name: 'Robbers\' Hoard', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.5, 0, -0.35, 0.5, 0.65, 0.35]], top: 0.65, use: 'hoard', icon: 'chest', hidden: true });
+
+P({ id: 'loot_chest', name: 'Old Chest', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.5, 0, -0.35, 0.5, 0.65, 0.35]], top: 0.65, use: 'loot', icon: 'chest', hidden: true });
+P({ id: 'cracked_wall', name: 'Cracked Wall', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'wall', hidden: true });
 
 export const CLAIM_RADIUS = 22;
 

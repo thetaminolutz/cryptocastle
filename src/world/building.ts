@@ -124,6 +124,21 @@ const MODELS: Record<string, () => THREE.BufferGeometry> = {
     for (const s of [-1, 1]) { const m = new THREE.SphereGeometry(0.5, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); m.scale(0.6, 0.5, 2); m.translate(s * 0.9, 0, 0); b.add(m, { layer: 'dirt' }); }
     return b.build();
   },
+  loot_chest: () => {
+    const b = new GeoBuilder();
+    box(b, 1.0, 0.45, 0.66, 0, 0.22, 0, 'planks', [0.42, 0.36, 0.32]);
+    const lid = new THREE.CylinderGeometry(0.33, 0.33, 1.0, 10, 1, false, 0, Math.PI); lid.rotateZ(Math.PI / 2); lid.rotateX(Math.PI / 2); lid.scale(1, 0.5, 1); lid.translate(0, 0.45, 0);
+    b.add(lid, { layer: 'planks', color: [0.42, 0.36, 0.32] });
+    for (const x of [-0.36, 0.36]) box(b, 0.07, 0.5, 0.68, x, 0.25, 0, 'ore_iron', [0.5, 0.5, 0.55]);
+    box(b, 0.12, 0.14, 0.04, 0, 0.42, -0.34, 'ore_gold', [1, 0.85, 0.5]);
+    return b.build();
+  },
+  cracked_wall: () => {
+    const b = new GeoBuilder();
+    box(b, 2.2, 2.6, 0.12, 0, 1.3, 0.05, 'cobble', [0.75, 0.72, 0.68], 0, [1.1, 1.3]);
+    for (let i = 0; i < 6; i++) { const c = new THREE.BoxGeometry(0.04, 0.5 + (i % 3) * 0.2, 0.02); c.rotateZ((i - 2.5) * 0.35); c.translate(-0.5 + i * 0.2, 1.1 + Math.sin(i * 2) * 0.4, -0.02); b.add(c, { layer: 'white', color: [0.05, 0.04, 0.03] }); }
+    return b.build();
+  },
   hoard_chest: () => {
     const b = new GeoBuilder();
     box(b, 1.0, 0.45, 0.66, 0, 0.22, 0, 'planks', [0.45, 0.33, 0.25]);

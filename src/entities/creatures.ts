@@ -15,15 +15,21 @@ import type { Building } from '../world/building';
 export interface Creature {
   def: EnemyDef; pos: THREE.Vector3; yaw: number;
   hp: number; maxHp: number; dmgMul: number; elite: boolean; scale: number;
-  state: 'hidden' | 'idle' | 'wander' | 'chase' | 'windup' | 'recover' | 'flee' | 'stunned' | 'dead';
+  state: 'hidden' | 'idle' | 'wander' | 'chase' | 'windup' | 'recover' | 'flee' | 'stunned' | 'slam' | 'dead';
   timer: number; attackT: number; phase: number; speed: number;
   target: THREE.Vector3; home: THREE.Vector3; flash: number; tilt: number; deadT: number; looted: boolean;
   slot: number; alerted: boolean; knock: THREE.Vector3; burn: number; hover: number;
+  /** bosses: phase reached, slam timer, movement multiplier; ranged: this windup ends in a shot */
+  phaseIdx: number; slamT: number; speedMul: number; shooting: boolean; rangedOn: boolean;
 }
 
 export interface CreatureHooks {
   /** the creature's strike lands (if the player is still in reach) */
   strike(c: Creature): void;
+  /** a ranged attack is released */
+  shoot(c: Creature): void;
+  /** a boss's telegraphed ground slam lands */
+  slam(c: Creature, radius: number, dmg: number, type: DmgType): void;
   toast(text: string, color?: string): void;
 }
 
@@ -73,10 +79,15 @@ export class Creatures {
   /** kills per enemy id (bestiary) */
   kills: Record<string, number> = {};
   enabled = true;
+  private rings: THREE.Mesh[] = [];
   /** called once when a creature dies (quests, arena) */
   onDeath: ((c: Creature) => void) | null = null;
 
   constructor(private world: World, private gen: TerrainGen, private building: Building, shadows: ShadowSystem, public hooks: CreatureHooks) {
+    for (let i = 0; i < 3; i++) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 0.35, 0.15), transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }));
+      ring.visible = false; this.rings.push(ring); this.group.add(ring);
+    }
     for (const def of Object.values(ENEMIES)) {
       const l = new Layer(def, MAX);
       this.layers.set(def.id, l);
@@ -95,8 +106,11 @@ export class Creatures {
       def, pos: pos.clone(), yaw: Math.random() * 6.28, hp, maxHp: hp, dmgMul: (1 + (danger - 1) * 0.12) * (elite ? 1.4 : 1), elite,
       scale: (0.9 + Math.random() * 0.2) * (elite ? 1.15 : 1), state: def.ambush ? 'hidden' : 'wander', timer: Math.random() * 3,
       attackT: 0, phase: Math.random() * 6, speed: 0, target: pos.clone(), home: pos.clone(), flash: 0, tilt: 0, deadT: 0,
-      looted: false, slot, alerted: false, knock: V(), burn: 0, hover: 0
+      looted: false, slot, alerted: false, knock: V(), burn: 0, hover: 0,
+      phaseIdx: 0, slamT: def.boss?.slam?.every ?? 0, speedMul: 1, shooting: false, rangedOn: !def.boss
     };
+    if (def.scale) c.scale = def.scale * (def.boss ? 1 : 0.95 + Math.random() * 0.1);
+    if (def.boss) { c.elite = false; c.dmgMul = 1 + (danger - 1) * 0.1; c.hp = c.maxHp = def.hp * (1 + (danger - 1) * 0.12); }
     this.list.push(c);
     return c;
   }
@@ -112,13 +126,15 @@ export class Creatures {
     const fromStart = Math.hypot(x, z);
     if (!night && fromStart < 60) return;
     if (!night && col.village > 0.1) return; // villages are safe by day (raids come at night)
-    const options = Object.values(ENEMIES).filter((d) => d.biomes.includes(col.biome) && (!d.night || night) && (d.minDanger ?? 1) <= col.danger);
+    const ground = this.world.groundY(x, z);
+    const pos = V(x, ground, z);
+    const water = this.world.waterSurface(x, ground + 1, z) > ground - 0.2;
+    const options = Object.values(ENEMIES).filter((d) => d.biomes.includes(col.biome) && (!d.night || night) && (d.minDanger ?? 1) <= col.danger && !!d.aquatic === water);
     if (!options.length) return;
     if (!night && Math.random() < 0.55) return; // fewer monsters by day
     const def = options[Math.floor(Math.random() * options.length)];
-    const ground = this.world.groundY(x, z);
-    const pos = V(x, ground, z);
-    if (this.world.waterSurface(x, ground + 1, z) > ground - 0.2) return;
+    if (def.rare && Math.random() > def.rare) return;
+    if (def.boss && this.list.some((c) => c.def === def && c.state !== 'dead')) return;
     if (this.building.isSafe(pos)) return;
     const n = def.group[0] + Math.floor(Math.random() * (def.group[1] - def.group[0] + 1));
     for (let i = 0; i < n && this.alive.length < MAX; i++) {
@@ -147,6 +163,18 @@ export class Creatures {
       if (d < min && d > 1e-4) { const p = (min - d) / 2; a.pos.x -= (dx / d) * p; a.pos.z -= (dz / d) * p; b.pos.x += (dx / d) * p; b.pos.z += (dz / d) * p; }
     }
     for (const [id, layer] of this.layers) layer.write(this.list.filter((c) => c.def.id === id));
+    // telegraph rings under slamming bosses
+    let ri = 0;
+    for (const c of this.list) {
+      if (c.state !== 'slam' || ri >= this.rings.length) continue;
+      const r = this.rings[ri++], sl = c.def.boss!.slam!;
+      r.visible = true;
+      r.position.set(c.pos.x, c.pos.y + 0.08, c.pos.z);
+      const k = 1 - Math.max(0, c.timer) / 1.4;
+      r.scale.setScalar(sl.radius * (0.3 + 0.7 * k));
+      (r.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.35 * Math.sin(k * 30) ** 2;
+    }
+    for (; ri < this.rings.length; ri++) this.rings[ri].visible = false;
   }
 
   private think(c: Creature, dt: number, player: THREE.Vector3, night: boolean, hidden: boolean) {
@@ -194,16 +222,40 @@ export class Creatures {
         const ang = Math.atan2(c.pos.x - player.x, c.pos.z - player.z) + ((c.slot % 3) - 1) * 0.6;
         const stand = def.reach * 0.85;
         const tx = player.x + Math.sin(ang) * stand, tz = player.z + Math.cos(ang) * stand;
+        const boss = def.boss;
+        if (boss?.slam) {
+          c.slamT -= dt;
+          if (c.slamT <= 0 && dist < boss.slam.radius + 1.5) { c.state = 'slam'; c.timer = 1.4; c.slamT = boss.slam.every; this.hooks.toast(`${def.name} gathers itself…`, '#e08070'); break; }
+        }
+        const r = def.ranged && c.rangedOn ? def.ranged : null;
+        if (r && dist < r.range && dist > def.reach + 1.2) {
+          // keep at a distance and shoot
+          face(player.x, player.z, 8);
+          want = dist < r.range * 0.55 && !boss ? -def.speed * 0.6 : dist > r.range * 0.8 ? def.run * 0.6 : 0;
+          if (c.timer <= 0) { c.state = 'windup'; c.timer = def.windup; c.shooting = true; }
+          break;
+        }
         if (dist > def.reach + 0.3) { face(tx, tz, 6); want = dist > 6 ? def.run : def.run * 0.7; }
         else { face(player.x, player.z, 10); if (c.timer <= 0) { c.state = 'windup'; c.timer = def.windup; } }
         break;
       }
+      case 'slam':
+        face(player.x, player.z, 4);
+        c.attackT = Math.min(1.2, c.attackT + dt * 1.2);
+        c.flash = 0.3 + 0.3 * Math.sin(c.timer * 20);
+        if (c.timer <= 0) {
+          const sl = def.boss!.slam!;
+          this.hooks.slam(c, sl.radius, sl.dmg * c.dmgMul, sl.type);
+          c.state = 'recover'; c.timer = def.cooldown * 1.2;
+        }
+        break;
       case 'windup':
         face(player.x, player.z, 6);
         c.attackT = Math.min(1, c.attackT + dt / Math.max(0.15, def.windup)); // raise the weapon (telegraph)
         c.flash = Math.max(c.flash, c.elite ? 0.25 : 0);
         if (c.timer <= 0) {
-          if (dist < def.reach + 0.6) this.hooks.strike(c);
+          if (c.shooting) { c.shooting = false; this.hooks.shoot(c); c.timer = 0; }
+          else if (dist < def.reach + 0.6) this.hooks.strike(c);
           c.state = 'recover'; c.timer = def.cooldown;
         }
         break;
@@ -221,8 +273,29 @@ export class Creatures {
         if (c.timer <= 0) { c.state = 'chase'; c.timer = 0.4; }
         break;
     }
+    // boss phases: stronger, faster, calls for help
+    if (def.boss) {
+      const ph = def.boss.phases;
+      while (c.phaseIdx < ph.length && c.hp / c.maxHp <= ph[c.phaseIdx].at) {
+        const P = ph[c.phaseIdx++];
+        if (P.speedMul) c.speedMul *= P.speedMul;
+        if (P.dmgMul) c.dmgMul *= P.dmgMul;
+        if (P.ranged) c.rangedOn = true;
+        if (P.say) this.hooks.toast(P.say, '#e8a030');
+        if (P.summon) {
+          const sd = ENEMIES[P.summon[0]];
+          for (let i = 0; i < P.summon[1]; i++) {
+            const a = (i / P.summon[1]) * Math.PI * 2, x = c.pos.x + Math.cos(a) * 4, z = c.pos.z + Math.sin(a) * 4;
+            if (!this.world.isLoaded(x, z)) continue;
+            const m = this.spawn(sd, V(x, this.world.groundNear(x, z, c.pos.y), z), 1 + (c.dmgMul - 1) * 4, i);
+            m.state = 'chase'; m.alerted = true; m.elite = false;
+          }
+        }
+      }
+    }
+    want *= c.speedMul;
     c.speed += (want - c.speed) * Math.min(1, dt * 6);
-    if (c.speed > 0.05) this.move(c, -Math.sin(c.yaw) * c.speed * dt, -Math.cos(c.yaw) * c.speed * dt);
+    if (Math.abs(c.speed) > 0.05) this.move(c, -Math.sin(c.yaw) * c.speed * dt, -Math.cos(c.yaw) * c.speed * dt);
     c.phase += dt * (2 + c.speed * 3) + (def.flying ? dt * 6 : 0);
     if (def.flying) c.hover = 0.9 + Math.sin(c.phase * 0.3) * 0.25;
   }

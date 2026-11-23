@@ -1,6 +1,7 @@
 // Gathering & using things: aim at terrain/trees, swing tools (mine, dig, chop),
 // harvest plants, place stations, eat, drink. Also builds the 3D model of the item
 // in the hero's hand.
+import { METAL_ENV } from '../entities/hero';
 import * as THREE from 'three';
 import { input } from '../engine/input';
 import { ITEMS, MINE, PLANT_DROPS, TREE_DROPS, ToolKind, weaponOf } from '../data/items';
@@ -45,7 +46,7 @@ export function heldModel(id: string | null): THREE.Object3D | null {
     const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); return m;
   };
   const kind: ToolKind | undefined = def.tool?.kind;
-  if (kind === 'pickaxe' || kind === 'axe' || kind === 'shovel' || kind === 'sickle' || kind === 'knife') {
+  if (kind === 'pickaxe' || (kind === 'axe' && !def.weapon) || kind === 'shovel' || kind === 'sickle' || kind === 'knife') {
     const len = kind === 'knife' ? 0.12 : kind === 'shovel' ? 0.95 : 0.7;
     add(new THREE.CylinderGeometry(0.018, 0.022, len, 6), wood, 0, len / 2 - 0.1, 0);
     const top = len - 0.1;
@@ -73,6 +74,76 @@ export function heldModel(id: string | null): THREE.Object3D | null {
     add(new THREE.SphereGeometry(0.035, 6, 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 4, 1.5) }), 0, 0.47, 0);
     return g;
   }
+  // weapons
+  const steel = new THREE.MeshStandardMaterial({ color: new THREE.Color(def.icon.color), roughness: 0.3, metalness: 0.85, envMap: METAL_ENV.tex, envMapIntensity: 0.45 });
+  const grip = new THREE.MeshStandardMaterial({ color: new THREE.Color(def.icon.accent ?? '#3a2618'), roughness: 0.8 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0xb08a40, roughness: 0.35, metalness: 0.9, envMap: METAL_ENV.tex, envMapIntensity: 0.45 });
+  const blade = (len: number, w: number, curve = 0) => {
+    const sh = new THREE.Shape();
+    sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.quadraticCurveTo(w / 2 + curve, len * 0.6, curve * 1.4, len); sh.quadraticCurveTo(-w / 2 + curve * 0.6, len * 0.6, -w / 2, 0);
+    const g2 = new THREE.ExtrudeGeometry(sh, { depth: 0.012, bevelEnabled: true, bevelSize: 0.004, bevelThickness: 0.006, bevelSegments: 1 });
+    g2.translate(0, 0, -0.006); g2.rotateY(Math.PI / 2);
+    return g2;
+  };
+  if (kind === 'sword' || kind === 'longsword' || kind === 'saber' || kind === 'dagger') {
+    const L = kind === 'longsword' ? 0.95 : kind === 'dagger' ? 0.26 : kind === 'saber' ? 0.72 : 0.72;
+    const gl = kind === 'longsword' ? 0.24 : 0.12;
+    add(new THREE.CylinderGeometry(0.018, 0.018, gl, 6), grip, 0, gl / 2 - 0.06, 0);
+    add(new THREE.SphereGeometry(0.028, 8, 6), brass, 0, -0.07, 0);
+    if (kind === 'saber') add(new THREE.TorusGeometry(0.06, 0.008, 4, 10, Math.PI), brass, 0, gl - 0.04, 0, 0, Math.PI / 2, -Math.PI / 2);
+    else add(new THREE.BoxGeometry(kind === 'dagger' ? 0.1 : 0.2, 0.025, 0.035), brass, 0, gl - 0.06, 0);
+    add(blade(L, kind === 'longsword' ? 0.055 : kind === 'dagger' ? 0.04 : 0.045, kind === 'saber' ? 0.06 : 0), steel, 0, gl - 0.05, 0);
+    return g;
+  }
+  if (kind === 'axe' && def.weapon) {
+    add(new THREE.CylinderGeometry(0.02, 0.024, 0.85, 6), wood, 0, 0.32, 0);
+    const sh = new THREE.Shape(); sh.moveTo(0, -0.08); sh.quadraticCurveTo(0.22, -0.16, 0.24, 0.0); sh.quadraticCurveTo(0.22, 0.16, 0, 0.08); sh.closePath();
+    const bg = new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false }); bg.translate(0, 0, -0.01); bg.rotateY(Math.PI / 2);
+    add(bg, steel, 0, 0.66, 0); add(bg.clone().rotateY(Math.PI), steel, 0, 0.66, 0);
+    return g;
+  }
+  if (kind === 'hammer' || kind === 'mace' || kind === 'morningstar' || kind === 'club') {
+    const len = kind === 'hammer' ? 0.85 : kind === 'club' ? 0.6 : 0.65;
+    add(new THREE.CylinderGeometry(0.02, 0.024, len, 6), kind === 'club' ? new THREE.MeshStandardMaterial({ color: new THREE.Color(def.icon.color), roughness: 0.9 }) : wood, 0, len / 2 - 0.08, 0);
+    const top = len - 0.08;
+    if (kind === 'hammer') add(new THREE.BoxGeometry(0.11, 0.11, 0.26), steel, 0, top, 0);
+    else if (kind === 'club') { add(new THREE.CylinderGeometry(0.06, 0.03, 0.3, 7), new THREE.MeshStandardMaterial({ color: new THREE.Color(def.icon.color), roughness: 0.9 }), 0, top - 0.05, 0); if (id.includes('spiked')) for (let i = 0; i < 8; i++) add(new THREE.ConeGeometry(0.012, 0.06, 4), brass, Math.cos(i) * 0.06, top - 0.1 + (i % 3) * 0.06, Math.sin(i) * 0.06, 0, 0, Math.PI / 2 - i); }
+    else {
+      add(new THREE.SphereGeometry(0.08, 10, 8), steel, 0, top, 0);
+      if (kind === 'morningstar' || id.includes('censer')) for (let i = 0; i < 10; i++) { const a = i * 2.4, b2 = i * 0.9; const sp = add(new THREE.ConeGeometry(0.015, 0.07, 4), steel, Math.cos(a) * Math.sin(b2) * 0.09, top + Math.cos(b2) * 0.09, Math.sin(a) * Math.sin(b2) * 0.09); sp.lookAt(sp.position.clone().multiplyScalar(2).setY(top + (sp.position.y - top) * 2)); sp.rotateX(Math.PI / 2); }
+    }
+    return g;
+  }
+  if (kind === 'spear') {
+    add(new THREE.CylinderGeometry(0.018, 0.02, 1.7, 6), wood, 0, 0.55, 0);
+    add(new THREE.ConeGeometry(0.035, 0.22, 4), steel, 0, 1.5, 0);
+    return g;
+  }
+  if (kind === 'whip') {
+    add(new THREE.CylinderGeometry(0.022, 0.022, 0.22, 6), grip, 0, 0.05, 0);
+    const pts = [0, 1, 2, 3, 4, 5, 6].map((i) => new THREE.Vector3(Math.sin(i * 0.6) * 0.05 * i, 0.16 + i * 0.12, -i * 0.04));
+    add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.008, 4), new THREE.MeshStandardMaterial({ color: new THREE.Color(def.icon.color), roughness: 0.6, metalness: 0.4 }));
+    for (let i = 2; i < 7; i++) add(new THREE.ConeGeometry(0.01, 0.04, 3), brass, pts[i].x, pts[i].y, pts[i].z);
+    return g;
+  }
+  if (kind === 'bow') {
+    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, -0.55, 0.05), new THREE.Vector3(0, 0.1, -0.28), new THREE.Vector3(0, 0.75, 0.05));
+    add(new THREE.TubeGeometry(curve, 16, 0.016, 5), new THREE.MeshStandardMaterial({ color: new THREE.Color(def.icon.color), roughness: 0.6 }));
+    const str = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -0.55, 0.05), new THREE.Vector3(0, 0.75, 0.05)]);
+    g.add(new THREE.Line(str, new THREE.LineBasicMaterial({ color: 0xe8e0cc })));
+    return g;
+  }
+  if (kind === 'crossbow') {
+    add(new THREE.BoxGeometry(0.05, 0.05, 0.6), wood, 0, 0.08, -0.15);
+    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(-0.3, 0.08, -0.38), new THREE.Vector3(0, 0.08, -0.5), new THREE.Vector3(0.3, 0.08, -0.38));
+    add(new THREE.TubeGeometry(curve, 10, 0.014, 4), steel);
+    return g;
+  }
+  if (kind === 'wand') {
+    add(new THREE.CylinderGeometry(0.01, 0.016, 0.38, 6), wood, 0, 0.12, 0);
+    add(new THREE.SphereGeometry(0.03, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(def.icon.color).multiplyScalar(3) }), 0, 0.32, 0);
+    return g;
+  }
   // anything else: a small bundle
   const mesh = add(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshStandardMaterial({ color: new THREE.Color(def.icon.color), roughness: 0.8 }), 0, 0.02, -0.04);
   mesh.rotation.set(0.4, 0.4, 0);
@@ -93,6 +164,8 @@ export class Interaction {
   private action: (() => void) | null = null;
   readonly group = new THREE.Group();
   combat: Combat | null = null;
+  /** a worn light source (Hemera's Lantern) */
+  carriedLight = false;
   /** herbalism: multiplier for plant harvests */
   herbMul = 1;
   /** game-provided action that takes priority (e.g. recover your pack) */
@@ -124,6 +197,9 @@ export class Interaction {
       const p = new THREE.Vector3(); this.hero.held.getWorldPosition(p); p.y += 0.5;
       const f = 1 + 0.12 * Math.sin(time * 11) + 0.06 * Math.sin(time * 27);
       this.props.heldLight = { pos: p, col: V(3.0 * f, 1.7 * f, 0.7 * f), r: 12 };
+    } else if (this.carriedLight) {
+      const p = this.player.pos.clone(); p.y += 1.6;
+      this.props.heldLight = { pos: p, col: V(2.2, 2.0, 1.4), r: 10 };
     } else this.props.heldLight = null;
 
     this.aim(camera);
@@ -135,7 +211,7 @@ export class Interaction {
     const attack = input.button('attack');
     const busy = this.player.state === 'swim' || this.player.state === 'climb' || this.player.state === 'roll' || this.player.stunT > 0 || this.player.blocking;
     const fighting = !!this.creatures && this.creatures.alive.some((c) => c.state !== 'hidden' && c.pos.distanceTo(this.player.pos) < 9);
-    const speed = weaponOf(this.inv.held?.id).speed;
+    const speed = weaponOf(this.inv.held?.id).speed * (1 + (this.combat?.perks.attackSpeed ?? 0));
     if (this.swing >= 0.5 && attack.pressed) this.queued = true;
     if (this.swing < 0 && (attack.down || this.queued) && !busy && this.harvestT < 0) {
       const s = this.inv.held;

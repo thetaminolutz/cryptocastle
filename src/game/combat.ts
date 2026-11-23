@@ -6,6 +6,8 @@ import { input } from '../engine/input';
 import { audio } from '../engine/audio';
 import { settings } from '../engine/settings';
 import { ITEMS, weaponOf, DmgType } from '../data/items';
+import { LOOT_TIERS, AFFIXES } from '../data/gear';
+import { stackName } from './inventory';
 import type { Status } from '../data/enemies';
 import type { Player } from '../entities/player';
 import type { Creatures, Creature } from '../entities/creatures';
@@ -56,7 +58,9 @@ export class Combat {
 
   /** Damage multiplier from levels. */
   /** character perks: damage, life steal, fire/curse chance, extra block, crit chance */
-  perks = { dmg: 1, lifesteal: 0, fire: 0, curse: 0, block: 0, crit: 0.08 };
+  perks = { dmg: 1, lifesteal: 0, fire: 0, curse: 0, block: 0, crit: 0.08, frost: 0, ranged: 0, attackSpeed: 0, xp: 1, gold: 1, fireRes: 0, poisonRes: 0 };
+  /** fires a projectile (set by the game) */
+  shoot: ((from: THREE.Vector3, dir: THREE.Vector3, speed: number, dmg: number, type: DmgType, kind: 'arrow' | 'bolt' | 'spell') => void) | null = null;
   get power() { return 1 + (this.level - 1) * 0.04; }
 
   get shield(): number {
@@ -113,6 +117,7 @@ export class Combat {
     const w = weaponOf(held);
     const mult = (heavy ? 2.2 : combo >= 2 ? 1.45 : 1) * this.power * this.perks.dmg;
     const origin = p.pos.clone().setY(p.pos.y + 1);
+    if (w.ranged) return this.fireRanged(w, mult, heavy);
     // with a locked target, swing toward it
     if (this.lock && this.lock.pos.distanceTo(p.pos) < w.reach + 2) p.yaw = Math.atan2(-(this.lock.pos.x - p.pos.x), -(this.lock.pos.z - p.pos.z));
     let hit = false;
@@ -125,6 +130,7 @@ export class Combat {
       hit = true;
       if (this.perks.lifesteal) p.life = Math.min(p.maxLife, p.life + dmg * this.perks.lifesteal);
       if (c.state !== 'dead' && Math.random() < this.perks.fire) c.burn = Math.max(c.burn, 3);
+      if (c.state !== 'dead' && Math.random() < this.perks.frost) { this.creatures.stun(c, 1.1); this.number(c.pos.clone().setY(c.pos.y + c.def.height + 0.4), 'Frozen', '#a8e0ff'); }
       if (c.state !== 'dead' && Math.random() < this.perks.curse) { this.creatures.damage(c, c.maxHp * 0.06, 'shadow', p.pos, false); this.number(c.pos.clone().setY(c.pos.y + c.def.height + 0.4), 'Cursed', '#b080e0'); }
       if (c.state === 'dead') this.onKill(c);
     }
@@ -143,6 +149,53 @@ export class Combat {
     return hit;
   }
 
+  /** Bows, crossbows and wands: a projectile toward the locked target, the nearest enemy in front, or straight ahead. */
+  private fireRanged(w: ReturnType<typeof weaponOf>, mult: number, heavy: boolean): boolean {
+    const p = this.player, r = w.ranged!;
+    if (r.ammo && this.inv.count(r.ammo) <= 0) { this.hooks.toast(`No ${ITEMS[r.ammo].name.toLowerCase()}s left.`, '#e08070'); return false; }
+    if (r.ammo) this.inv.remove(r.ammo, 1);
+    const from = p.pos.clone().setY(p.pos.y + 1.45);
+    let target: THREE.Vector3 | null = null;
+    if (this.lock && this.lock.state !== 'dead') target = this.lock.pos.clone().setY(this.lock.pos.y + this.lock.def.height * 0.6 + this.lock.hover);
+    else {
+      // aim assist: nearest living enemy within ~30° of the facing direction
+      let best = Infinity;
+      const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
+      for (const c of this.creatures.alive) {
+        const dx = c.pos.x - p.pos.x, dz = c.pos.z - p.pos.z, d = Math.hypot(dx, dz);
+        if (d > w.reach || d < 0.5) continue;
+        const cos = (dx * fx + dz * fz) / d;
+        if (cos < 0.86) continue;
+        const score = d * (2 - cos);
+        if (score < best) { best = score; target = c.pos.clone().setY(c.pos.y + c.def.height * 0.6 + c.hover); }
+      }
+    }
+    if (target && r.ammo) {
+      // aim above the target to make up for the arrow's drop
+      const t = target.distanceTo(from) / (r.speed * (heavy ? 1.2 : 1));
+      target.y += 0.5 * (w.speed < 0.7 ? 4 : 9) * t * t;
+    }
+    const dir = target ? target.sub(from).normalize() : new THREE.Vector3(-Math.sin(p.yaw), 0.03, -Math.cos(p.yaw)).normalize();
+    if (target) p.yaw = Math.atan2(-dir.x, -dir.z);
+    const kind = r.ammo ? (w.speed < 0.7 ? 'bolt' : 'arrow') : 'spell';
+    this.shoot?.(from, dir, r.speed * (heavy ? 1.2 : 1), w.dmg * mult * (1 + this.perks.ranged) * (heavy ? 1.3 : 1), w.type, kind);
+    audio.whoosh();
+    p.stamina = Math.max(0, p.stamina - w.stamina * (heavy ? 1.8 : 1));
+    return true;
+  }
+
+  /** A projectile from the player hit a creature. */
+  projectileHit(c: Creature, dmg: number, type: DmgType, from: THREE.Vector3) {
+    const crit = Math.random() < this.perks.crit;
+    const dealt = this.creatures.damage(c, dmg * (crit ? 1.8 : 1), type, from, false);
+    const eff = c.def.weak[type] ?? 1;
+    this.number(c.pos.clone().setY(c.pos.y + c.def.height + c.hover), String(Math.round(dealt)), eff > 1.05 ? '#ffd040' : eff < 0.95 ? '#9a9a9a' : '#ffffff', crit);
+    this.lastHit = c;
+    audio.impact(false);
+    if (this.perks.lifesteal) this.player.life = Math.min(this.player.maxLife, this.player.life + dealt * this.perks.lifesteal * 0.5);
+    if (c.state === 'dead') this.onKill(c);
+  }
+
   private onKill(c: Creature) {
     this.gainXp(Math.round(c.def.xp * (c.elite ? 2.5 : 1)));
     if (this.lock === c) this.lock = null;
@@ -150,7 +203,7 @@ export class Combat {
   }
 
   gainXp(n: number) {
-    this.xp += n;
+    this.xp += Math.round(n * this.perks.xp);
     while (this.level < 50 && this.xp >= xpForLevel(this.level + 1)) {
       this.level++;
       this.player.maxLife += 5;
@@ -187,6 +240,8 @@ export class Combat {
     }
     if (this.status.has('curse')) dmg *= 1.3;
     dmg *= p.takenMul;
+    if (type === 'fire') dmg *= 1 - this.perks.fireRes;
+    if (status && status[0] === 'poison' && this.perks.poisonRes >= 1) status = undefined;
     p.damage(dmg, name.toLowerCase().startsWith('a') ? `an ${name.toLowerCase()}` : `a ${name.toLowerCase()}`);
     this.number(p.pos.clone().setY(p.pos.y + 2), String(Math.round(dmg)), '#ff5a4a');
     this.hooks.shake(Math.min(0.4, 0.08 + dmg / 60));
@@ -217,8 +272,21 @@ export class Combat {
     }
     if (isCreature) {
       const [g0, g1] = (target as Creature).def.gold;
-      const g = Math.round((g0 + Math.random() * (g1 - g0)) * (bonus ? 3 : 1));
+      const g = Math.round((g0 + Math.random() * (g1 - g0)) * (bonus ? 3 : 1) * this.perks.gold);
       if (g > 0) { this.hooks.addGold(g); got.push(`${g} gold`); }
+    }
+    if (isCreature) {
+      // gear: elites and armed humanoids sometimes carry something worth taking
+      const c = target as Creature;
+      const armed = ['bandit', 'skeleton', 'orc', 'dark_knight', 'cultist', 'champion', 'grave_robber', 'kobold', 'goblin'].includes(c.def.id);
+      const chance = c.elite ? 0.4 : armed ? 0.07 : 0.015;
+      if (Math.random() < chance) {
+        const tier = c.dmgMul > 1.6 || c.elite && Math.random() < 0.3 ? 'high' : c.dmgMul > 1.2 ? 'mid' : 'low';
+        const pool = LOOT_TIERS[tier];
+        const id = pool[Math.floor(Math.random() * pool.length)];
+        const st = { id, n: 1, dur: ITEMS[id].tool?.durability || undefined, affix: ITEMS[id].weapon && Math.random() < (c.elite ? 0.6 : 0.25) ? Object.keys(AFFIXES)[Math.floor(Math.random() * Object.keys(AFFIXES).length)] : undefined };
+        if (this.inv.addStack(st)) got.push(stackName(st));
+      }
     }
     target.looted = true;
     return got;

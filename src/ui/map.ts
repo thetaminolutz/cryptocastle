@@ -7,7 +7,7 @@ import { SEA_LEVEL } from '../world/constants';
 import type { TerrainGen } from '../world/terrain';
 
 export const MAP_CELL = 16;
-export interface MapMarker { x: number; z: number; kind: 'player' | 'home' | 'village' | 'citadel' | 'quest' | 'waystone' | 'pin' | 'pack' | 'landmark'; label?: string; yaw?: number; id?: string; }
+export interface MapMarker { x: number; z: number; kind: 'player' | 'home' | 'village' | 'citadel' | 'quest' | 'waystone' | 'pin' | 'pack' | 'landmark' | 'dungeon'; label?: string; yaw?: number; id?: string; }
 export interface MapSave { explored: number[]; pins: [number, number][]; waystones: string[]; places: string[]; }
 
 const key = (cx: number, cz: number) => (cx + 32768) * 65536 + (cz + 32768);
@@ -132,6 +132,11 @@ export class WorldMap {
           case 'waystone': ctx.fillStyle = '#80c0ff'; ctx.strokeStyle = '#08203a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(6, 0); ctx.lineTo(0, 8); ctx.lineTo(-6, 0); ctx.closePath(); ctx.stroke(); ctx.fill(); break;
           case 'pin': ctx.fillStyle = '#e05040'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, -8, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(0, 4); ctx.stroke(); break;
           case 'pack': ctx.fillStyle = '#ffe080'; ctx.fillRect(-4, -4, 8, 8); break;
+          case 'dungeon':
+            ctx.fillStyle = '#b8a0e0'; ctx.strokeStyle = '#1a0e2a'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-7, 6); ctx.lineTo(-7, -2); ctx.quadraticCurveTo(0, -10, 7, -2); ctx.lineTo(7, 6); ctx.closePath(); ctx.stroke(); ctx.fill();
+            ctx.fillStyle = '#1a0e2a'; ctx.fillRect(-2.5, 0, 5, 6);
+            break;
         }
         ctx.restore();
         if (m.label && (v.scale > 0.25 || m.kind === 'citadel' || m.kind === 'waystone')) {
