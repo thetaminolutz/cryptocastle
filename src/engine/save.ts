@@ -24,6 +24,8 @@ export interface SaveData {
   building?: BuildSave;
   stats?: { gold: number; xp: number; level: number; maxLife: number; kills: Record<string, number> };
   lostPack?: { x: number; y: number; z: number; items: (Stack | null)[] } | null;
+  villagers?: Record<string, import('../entities/villagers').NPCSave>;
+  shops?: Record<string, import('../game/dialogue').ShopState>;
 }
 
 /** A fallen One-Life character, remembered in the Cemetery of the Fallen. */

@@ -9,6 +9,7 @@ import { Simplex, hash3 } from './noise';
 import { B } from './blocks';
 import { CHUNK_HEIGHT, CHUNK_SIZE, SEA_LEVEL } from './constants';
 import { Biome, BIOMES, CLIMATE_BIOMES, Plant } from './biomes';
+import { villageAt, flattenWeight, isVillageHeightOk, VillageSite } from './villages';
 
 export const PAD = CHUNK_SIZE + 2;           // padded width (18): grid points -1..16
 export const PAD_LAYER = PAD * PAD;
@@ -38,6 +39,7 @@ export interface Column {
   floating: number;     // 0..1 floating-rocks weight
   crystal: number;      // 0..1 crystal-cave zone
   danger: number;
+  village: number;      // 0..1 how much this column belongs to a village (flattened, no trees)
 }
 
 export interface GeneratedChunk {
@@ -109,7 +111,30 @@ export class TerrainGen {
     }
   }
 
+  /** Column including village flattening. */
   column(x: number, z: number): Column {
+    const c = this.rawColumn(x, z);
+    const v = this.village(x, z);
+    if (v) {
+      const w = flattenWeight(v, x, z);
+      if (w > 0) {
+        c.height = c.height * (1 - w) + v.y * w;
+        c.village = w;
+        if (w > 0.5 && (c.biome === Biome.Beach || c.biome === Biome.Ocean)) c.biome = Biome.SunnyMeadows;
+      }
+    }
+    return c;
+  }
+
+  private rawFn = (x: number, z: number) => {
+    const c = this.rawColumn(x, z);
+    const ok = isVillageHeightOk(c.height) && c.liquid === B.WATER && c.cliff < 0.2 && c.floating < 0.1 &&
+      ![Biome.Ocean, Biome.Beach, Biome.SnowyMountains, Biome.MistySwamp, Biome.SunkenForest, Biome.VolcanicAshlands, Biome.CrystalCaves].includes(c.biome);
+    return { height: c.height, ok };
+  };
+  village(x: number, z: number): VillageSite | null { return villageAt(x, z, this.seed, this.rawFn); }
+
+  private rawColumn(x: number, z: number): Column {
     const n = this.n;
     const d2 = (x * x + z * z) / (260 * 260);
     const c = n[0].fbm2(x / 1000, z / 1000, 4) + 0.6 * Math.exp(-d2);
@@ -152,7 +177,7 @@ export class TerrainGen {
     const height = Math.max(4, Math.min(CHUNK_HEIGHT - 10, h));
     const floating = weights.find((e) => e.b === Biome.FloatingRocks)?.w ?? 0;
     const crystal = smooth(0.35, 0.55, n[18].fbm2(x / 380, z / 380, 2));
-    return { height, biome, liquidLevel, liquid, cliff, floating, crystal, danger: 1 + Math.sqrt(x * x + z * z) / 450 };
+    return { height, biome, liquidLevel, liquid, cliff, floating, crystal, danger: 1 + Math.sqrt(x * x + z * z) / 450, village: 0 };
   }
 
   /** Generate chunk (cx,cz) with a 1-sample border into padded arrays. */
@@ -192,7 +217,7 @@ export class TerrainGen {
     const canyon = col.biome === Biome.RedDesert;
     const rvWidth = canyon ? 0.06 : 0.03;
     const startDist = Math.hypot(wx, wz);
-    const awayFromStart = smooth(90, 170, startDist);
+    const awayFromStart = smooth(90, 170, startDist) * (1 - Math.min(1, col.village * 2));
     const ravine = rv < rvWidth && h > SEA_LEVEL + 3 && awayFromStart > 0 ? Math.sqrt(1 - rv / rvWidth) * (canyon ? 30 : 24) * awayFromStart : 0;
     const rvDist = rv * 180;
     // cave entrances: where this noise is high the surface protection drops
@@ -304,7 +329,7 @@ export class TerrainGen {
         const col = colAt(lx, lz);
         const bd = BIOMES[col.biome];
         let dens = bd.treeDensity;
-        if (tx * tx + tz * tz < 13 * 13) dens = 0; // keep the start clearing open
+        if (tx * tx + tz * tz < 13 * 13 || col.village > 0.05) dens = 0; // keep the start clearing and villages open
         if (hash3(gx, 7, gz, seed) >= dens || !bd.trees.length) continue;
         const y = surface(lx, lz, Math.min(CHUNK_HEIGHT - 2, Math.ceil(col.height) + 8));
         if (y < 0) continue;
@@ -332,6 +357,7 @@ export class TerrainGen {
         if (col.biome !== centre.biome && hash3(cx, k, cz, seed ^ 0x53) < 0.5) continue;
         const wx = x0 + lx, wz = z0 + lz;
         const d2s = wx * wx + wz * wz;
+        if (col.village > 0.3 && kind !== Plant.Grass && kind !== Plant.Flower) continue;
         if (d2s < 9 || (d2s < 14 * 14 && kind !== Plant.Grass && kind !== Plant.Flower && kind !== Plant.Moonpetal && kind !== Plant.Mushroom)) continue;
         const y = surface(lx, lz, Math.min(CHUNK_HEIGHT - 2, Math.ceil(col.height) + 6));
         if (y < 0) continue;

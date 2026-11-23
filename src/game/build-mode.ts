@@ -137,7 +137,7 @@ export class BuildMode {
       this.strip.appendChild(c);
     };
     if (this.cat === 'plans') for (const bp of BLUEPRINTS) card(bp.id, bp.name, 'roof', [], bp.desc);
-    else for (const d of Object.values(PIECES)) if (d.cat === this.cat) card(d.id, d.name, d.icon, d.cost);
+    else for (const d of Object.values(PIECES)) if (d.cat === this.cat && !d.hidden) card(d.id, d.name, d.icon, d.cost);
   }
 
   // ---------------------------------------------------------------- per frame
@@ -158,7 +158,7 @@ export class BuildMode {
     this.plansBtn.textContent = `Build plans (${plannedNear})`;
 
     if (this.removeMode) {
-      this.removeTarget = pieceHit && pieceHit.point.distanceTo(eye) < REACH ? pieceHit.piece : null;
+      this.removeTarget = pieceHit && pieceHit.point.distanceTo(eye) < REACH && !pieceHit.piece.gen ? pieceHit.piece : null;
       if (!this.removeTarget) {
         // planned ghosts can be removed too
         const p = hit?.point;
@@ -177,7 +177,7 @@ export class BuildMode {
       this.ok = !this.candidates.some((p) => this.building.blocked(p));
       this.building.setPreview(this.candidates, this.ok);
     } else {
-      if (!PIECES[this.selected] || PIECES[this.selected].cat !== this.cat) this.selected = Object.values(PIECES).find((d) => d.cat === this.cat)!.id;
+      if (!PIECES[this.selected] || PIECES[this.selected].cat !== this.cat || PIECES[this.selected].hidden) this.selected = Object.values(PIECES).find((d) => d.cat === this.cat && !d.hidden)!.id;
       const p = this.building.snap(this.selected, hit.point, hit.normal, !!usePiece, this.rot);
       this.candidates = [p];
       this.ok = !this.building.blocked(p) && this.affordable(this.cost(p.id));

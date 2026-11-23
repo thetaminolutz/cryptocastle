@@ -408,6 +408,12 @@ void main() {
   vFlash = 0.0;
   #endif
   if (tm == 1) c *= uBiomeTint[int(aInst2.z + 0.5)] * mix(0.8, 1.15, aInst2.y);
+  else if (tm == 4) {
+    // clothing: earthy dyes by instance
+    int k = int(aInst2.y * 6.0);
+    vec3 dye = k == 0 ? vec3(0.16, 0.08, 0.04) : k == 1 ? vec3(0.07, 0.14, 0.05) : k == 2 ? vec3(0.06, 0.09, 0.2) : k == 3 ? vec3(0.32, 0.05, 0.03) : k == 4 ? vec3(0.3, 0.22, 0.05) : vec3(0.1, 0.1, 0.1);
+    c *= dye * 2.2;
+  }
   else if (tm == 2) {
     int k = int(aInst2.y * 5.0);
     c = k == 0 ? vec3(0.9, 0.15, 0.12) : k == 1 ? vec3(0.95, 0.8, 0.2) : k == 2 ? vec3(0.55, 0.35, 0.9) : k == 3 ? vec3(0.95, 0.95, 0.95) : vec3(0.3, 0.5, 0.95);

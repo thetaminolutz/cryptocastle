@@ -17,7 +17,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M5 Gathering, inventory, hotbar, crafting, tools, saving + skinned hero character | ✅ done |
 | M6 Building mode, furniture, chests, beds, land claims, blueprints | ✅ done |
 | M7 Combat, first 10 enemies, loot, death/respawn, game modes | ✅ done |
-| M8 Villages, NPCs with schedules, dialogue, shops, reputation | next |
+| M8 Villages, NPCs with schedules, dialogue, shops, reputation | ✅ done |
+| M9 Opening, Ashen Stranger, Herald, Tower of the First Rite, character creation | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -78,6 +79,19 @@ boars and bears fight back; every animal can be hunted. Loot bodies with USE.
 XP and levels ("You're a Two now."). **Modes:** Wanderer (wake at your bed, lose
 some gold, your pack waits where you fell) or One Life (death is permanent; a
 grave is kept for the Cemetery of the Fallen).
+
+**Villages (M8):** villages are generated from the seed (the first, e.g.
+"Briarton", lies a short walk from the clearing) on flattened ground: a well and
+market square with stalls, a tavern, a stone chapel, a smithy, 6–12 furnished
+houses and fenced farms. Every villager has a name, job, home, workplace,
+personality traits, likes and dislikes, family and a daily schedule (sleep,
+work, eat, tavern, chapel); they walk A* paths around buildings, open doors,
+chatter in speech bubbles, flee from monsters, and guards fight them. Talk to
+anyone: greetings change with time, weather, reputation and memories; ask for
+rumours, work (deliver items for gold), give gifts (they have favourites), rent
+a room at the inn, trade at the general store, smithy, alchemist, tailor or inn
+(prices follow reputation; shops have limited gold and restock every few days),
+or pickpocket, insult and threaten — word travels, and reputation is remembered.
 
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera (tap an enemy to lock on), **Strike/Mine/Chop/Dig** (hold to keep swinging), **Block**,
@@ -152,6 +166,8 @@ scripts/     icon generator (pixel-art PNGs, run automatically on build)
   `src/world/vegetation.ts` and list it in a biome's `trees` / `plants`.
 - **A new enemy:** add a row (stats, loot, biomes, model) to `ENEMIES` in
   `src/data/enemies.ts`.
+- **Villagers, dialogue, shops:** names, traits, templates, rumours and shop
+  stock are tables in `src/data/npcs.ts`; village layouts in `src/world/villages.ts`.
 - **A new building piece:** add a row to `PIECES` in `src/data/pieces.ts` and a
   model in `MODELS` in `src/world/building.ts`. Blueprints live in `BLUEPRINTS`.
 - **A new texture:** add a painter to `PAINTERS` in `src/world/textures.ts`.

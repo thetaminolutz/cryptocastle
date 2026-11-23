@@ -13,6 +13,8 @@ import { mulberry32 } from './noise';
 export interface Piece {
   id: string; x: number; y: number; z: number; rot: number;
   open?: boolean; planned?: boolean; items?: (Stack | null)[];
+  /** part of a generated village (not saved, cannot be removed) */
+  gen?: boolean;
 }
 export interface AABB { min: THREE.Vector3; max: THREE.Vector3; piece: Piece; }
 export interface BuildSave { pieces: Piece[]; respawn: [number, number, number] | null; }
@@ -189,6 +191,60 @@ const MODELS: Record<string, () => THREE.BufferGeometry> = {
       leaf.translate(0, 0.25, 0); leaf.rotateX(-0.5); leaf.rotateY(a); leaf.translate(0, 0.32, 0);
       b.add(leaf, { layer: 'fern', tint: 11, wind: () => 0.6 });
     }
+    return b.build();
+  },
+  well: () => {
+    const b = new GeoBuilder();
+    const ring = new THREE.CylinderGeometry(0.85, 0.9, 0.8, 14, 1, true); ring.translate(0, 0.4, 0); b.add(ring, { layer: 'stone_brick', uvScale: [3, 0.5] });
+    const rim = new THREE.TorusGeometry(0.85, 0.08, 6, 16); rim.rotateX(Math.PI / 2); rim.translate(0, 0.8, 0); b.add(rim, { layer: 'cobble' });
+    const water = new THREE.CircleGeometry(0.8, 14); water.rotateX(-Math.PI / 2); water.translate(0, 0.3, 0); b.add(water, { layer: 'white', color: [0.04, 0.08, 0.1] });
+    for (const s of [-1, 1]) log(b, s * 0.85, 0.8, 0, 1.5, 0.07);
+    const roof = new THREE.ConeGeometry(1.3, 0.8, 4); roof.rotateY(Math.PI / 4); roof.translate(0, 2.65, 0); b.add(roof, { layer: 'shingles', uvScale: [2, 1] });
+    const axle = new THREE.CylinderGeometry(0.06, 0.06, 1.7, 6); axle.rotateZ(Math.PI / 2); axle.translate(0, 1.9, 0); b.add(axle, { layer: 'bark_oak' });
+    const bucket = new THREE.CylinderGeometry(0.12, 0.1, 0.2, 8); bucket.translate(0.2, 1.4, 0); b.add(bucket, { layer: 'planks', color: DARK_WOOD });
+    return b.build();
+  },
+  stall: () => {
+    const b = new GeoBuilder();
+    box(b, 2.0, 0.9, 0.7, 0, 0.45, 0, 'planks', DARK_WOOD);
+    for (const x of [-0.95, 0.95]) for (const z of [-0.35, 0.8]) log(b, x, 0, z, 2.3, 0.05);
+    const awning = new THREE.PlaneGeometry(2.3, 1.5, 1, 1); awning.rotateX(-Math.PI / 2 + 0.35); awning.translate(0, 2.3, 0.25);
+    b.add(awning, { layer: 'fabric', color: [0.65, 0.15, 0.12], wind: () => 0.2 });
+    const rnd = mulberry32(9);
+    for (let i = 0; i < 7; i++) box(b, 0.16, 0.12, 0.16, -0.75 + i * 0.25, 0.97, -0.1 + (i % 2) * 0.15, 'fabric', [0.4 + rnd() * 0.5, 0.3 + rnd() * 0.4, 0.15 + rnd() * 0.3]);
+    return b.build();
+  },
+  crops: () => {
+    const b = new GeoBuilder();
+    box(b, 1.9, 0.12, 1.9, 0, 0.0, 0, 'dirt', [0.75, 0.6, 0.45]);
+    for (let i = 0; i < 4; i++) for (let k = 0; k < 4; k++) {
+      for (let j = 0; j < 2; j++) {
+        const st = new THREE.PlaneGeometry(0.06, 0.8); st.translate(0, 0.45, 0); st.rotateY(j * Math.PI / 2 + i); st.translate(-0.7 + i * 0.47, 0.05, -0.7 + k * 0.47);
+        b.add(st, { layer: 'white', color: [0.75, 0.68, 0.32], wind: (p) => p.y * 1.5 });
+      }
+      const head = new THREE.CapsuleGeometry(0.035, 0.14, 2, 5); head.translate(-0.7 + i * 0.47, 0.9, -0.7 + k * 0.47); b.add(head, { layer: 'white', color: [0.85, 0.72, 0.35], wind: () => 1.3 });
+    }
+    return b.build();
+  },
+  altar: () => {
+    const b = new GeoBuilder();
+    box(b, 1.6, 1.0, 0.7, 0, 0.5, 0, 'stone_brick', [0.95, 0.95, 0.98]);
+    box(b, 1.75, 0.08, 0.8, 0, 1.04, 0, 'fabric', [0.9, 0.88, 0.8]);
+    for (const x of [-0.55, 0.55]) { const c = new THREE.CylinderGeometry(0.04, 0.04, 0.3, 6); c.translate(x, 1.23, 0); b.add(c, { layer: 'white', color: [0.95, 0.93, 0.85] }); flame(b, x, 1.38, 0, 0.35); }
+    box(b, 0.05, 0.6, 0.05, 0, 1.38, 0.2, 'white', [0.8, 0.65, 0.3]); box(b, 0.32, 0.05, 0.05, 0, 1.5, 0.2, 'white', [0.8, 0.65, 0.3]);
+    return b.build();
+  },
+  pew: () => { const b = new GeoBuilder(); box(b, 1.6, 0.08, 0.45, 0, 0.45, 0, 'planks', DARK_WOOD); box(b, 1.6, 0.5, 0.06, 0, 0.75, 0.22, 'planks', DARK_WOOD); for (const x of [-0.75, 0.75]) box(b, 0.06, 0.45, 0.42, x, 0.22, 0, 'planks', DARK_WOOD); return b.build(); },
+  anvil_piece: () => {
+    const b = new GeoBuilder(); const steel: C3 = [0.22, 0.22, 0.24];
+    box(b, 0.7, 0.5, 0.5, 0, 0.25, 0, 'bark_oak'); box(b, 0.3, 0.2, 0.22, 0, 0.6, 0, 'white', steel); box(b, 0.7, 0.16, 0.26, 0, 0.78, 0, 'white', steel);
+    return b.build();
+  },
+  forge: () => {
+    const b = new GeoBuilder();
+    box(b, 1.4, 0.9, 1.0, 0, 0.45, 0, 'stone_brick'); box(b, 1.0, 0.1, 0.7, 0, 0.92, 0, 'lava', [1, 1, 1], 1.6);
+    const hood = new THREE.CylinderGeometry(0.25, 0.75, 0.9, 4, 1, true); hood.rotateY(Math.PI / 4); hood.translate(0, 1.9, 0); b.add(hood, { layer: 'stone_brick' });
+    box(b, 0.4, 1.2, 0.4, 0, 2.9, 0, 'stone_brick');
     return b.build();
   },
   claim_stone: () => {
@@ -462,7 +518,7 @@ export class Building {
     const y0 = Math.ceil((anchor.y - 0.15) * 4) / 4 + 0.1;
     return bp.pieces.map((p) => {
       const [x, z] = q === 0 ? [p.x, p.z] : q === 1 ? [p.z, -p.x] : q === 2 ? [-p.x, -p.z] : [-p.z, p.x];
-      return { id: p.id, x: ax + x, y: y0 + p.y, z: az + z, rot: p.rot - q * (Math.PI / 2), planned: true };
+      return { id: p.id, x: ax + x, y: y0 + p.y, z: az + z, rot: p.rot + q * (Math.PI / 2), planned: true };
     });
   }
 
@@ -490,7 +546,7 @@ export class Building {
   claims(): Piece[] { return this.pieces.filter((p) => p.id === 'claim_stone' && !p.planned); }
 
   serialize(): BuildSave {
-    return { pieces: this.pieces.map((p) => ({ ...p })), respawn: this.respawn ? [this.respawn.x, this.respawn.y, this.respawn.z] : null };
+    return { pieces: this.pieces.filter((p) => !p.gen).map((p) => ({ ...p })), respawn: this.respawn ? [this.respawn.x, this.respawn.y, this.respawn.z] : null };
   }
   load(d: BuildSave | undefined) {
     if (!d) return;
@@ -499,6 +555,16 @@ export class Building {
     this.dirty = true;
   }
   markDirty() { this.dirty = true; }
+
+  /** Show / hide the generated pieces of a village (kept out of saves). */
+  private genSets = new Map<string, Piece[]>();
+  setGenerated(id: string, list: Piece[] | null) {
+    const old = this.genSets.get(id);
+    if (old) this.pieces = this.pieces.filter((p) => !old.includes(p));
+    if (list) { this.genSets.set(id, list); this.pieces.push(...list); } else this.genSets.delete(id);
+    this.dirty = true;
+  }
+  hasGenerated(id: string) { return this.genSets.has(id); }
 }
 
 export type { PieceDef };

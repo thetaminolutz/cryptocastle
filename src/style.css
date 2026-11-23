@@ -228,3 +228,24 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .mode-card { width: min(380px, 90vw); border: 2px solid var(--panel-border); background: rgba(20,14,12,.85); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
 .mode-card h3 { margin: 0; letter-spacing: 4px; }
 .mode-card p { margin: 0; color: #b8a888; line-height: 1.5; font-size: 14px; }
+
+/* ---------- villagers & dialogue ---------- */
+.bubble { position: absolute; left: 0; top: 0; max-width: 220px; padding: 6px 10px; background: rgba(240,230,210,.92); color: #2a1e14;
+  font-size: 13px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.5); white-space: normal; text-align: center; }
+.dialogue { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 calc(16px + var(--sar)) calc(14px + var(--sab)) calc(16px + var(--sal)); display: flex; justify-content: center; }
+.dlg-box { width: min(900px, 100%); background: linear-gradient(#1e1612, #120c0a); border: 2px solid var(--panel-border); box-shadow: 0 0 0 3px #000, 0 -6px 30px rgba(0,0,0,.6); padding: 14px 16px; }
+.dlg-head { display: flex; gap: 14px; align-items: center; }
+.dlg-head img { width: 84px; height: 84px; border: 2px solid #5a3a22; }
+.dlg-who b { display: block; font-size: 19px; color: var(--gold); letter-spacing: 2px; }
+.dlg-who span { font-size: 13px; color: #a8987c; }
+.dlg-text { margin: 12px 0; font-size: 17px; line-height: 1.55; min-height: 54px; color: var(--ink); }
+.dlg-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.dlg-opt { min-width: 0; min-height: 56px; font-size: 15px; letter-spacing: 1px; text-transform: none; text-align: left; }
+.dlg-opt:disabled { opacity: .4; }
+.dlg-box.shop { max-height: 80vh; display: flex; flex-direction: column; gap: 10px; }
+.shop-cols { display: flex; gap: 16px; overflow-y: auto; flex: 1; touch-action: pan-y; }
+.shop-col { flex: 1; min-width: 0; }
+.shop-row { display: flex; align-items: center; gap: 10px; min-height: 52px; border-bottom: 1px solid #2a1c14; }
+.shop-row img { width: 36px; height: 36px; }
+.shop-row span { flex: 1; font-size: 14px; }
+.shop-row .btn { min-width: 76px; min-height: 44px; font-size: 14px; padding: 4px 8px; }

@@ -109,6 +109,7 @@ export class Creatures {
     // the start of the journey stays gentle in daylight
     const fromStart = Math.hypot(x, z);
     if (!night && fromStart < 60) return;
+    if (!night && col.village > 0.1) return; // villages are safe by day (raids come at night)
     const options = Object.values(ENEMIES).filter((d) => d.biomes.includes(col.biome) && (!d.night || night) && (d.minDanger ?? 1) <= col.danger);
     if (!options.length) return;
     if (!night && Math.random() < 0.55) return; // fewer monsters by day

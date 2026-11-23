@@ -20,6 +20,8 @@ export interface PieceDef {
   light?: [number, number, number, number];   // r, g, b (HDR), radius
   use?: PieceUse;
   icon: string;
+  /** generated only (villages); not in the build catalogue */
+  hidden?: boolean;
 }
 
 const steps = (n: number, w: number, d: number, h: number): Box[] =>
@@ -60,6 +62,15 @@ P({ id: 'claim_stone', name: 'Boundary Stone', cat: 'furniture', snap: 'free', c
 P({ id: 'fireplace', name: 'Fireplace', cat: 'light', snap: 'free', cost: [['stone', 10], ['log', 1]], boxes: [[-0.9, 0, -0.45, 0.9, 2.4, 0.45]], top: 2.4, light: [3.4, 1.7, 0.6, 12], icon: 'fireplace' });
 P({ id: 'wall_torch', name: 'Wall Torch', cat: 'light', snap: 'free', cost: [['torch', 1]], boxes: [], top: 0, light: [2.6, 1.4, 0.55, 9], icon: 'torch' });
 P({ id: 'lantern', name: 'Lantern Post', cat: 'light', snap: 'free', cost: [['iron_bar', 1], ['glass', 1], ['torch', 1], ['stick', 2]], boxes: [[-0.1, 0, -0.1, 0.1, 2.2, 0.1]], top: 2.2, light: [2.8, 2.0, 1.1, 13], icon: 'lantern' });
+
+// ---- village-only pieces
+P({ id: 'well', name: 'Well', cat: 'structure', snap: 'free', cost: [], boxes: [[-0.95, 0, -0.95, 0.95, 0.85, 0.95]], top: 0.85, icon: 'pot', hidden: true });
+P({ id: 'stall', name: 'Market Stall', cat: 'furniture', snap: 'free', cost: [], boxes: [[-1, 0, -0.35, 1, 0.9, 0.35]], top: 0.9, icon: 'table', hidden: true });
+P({ id: 'crops', name: 'Crops', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'carpet', hidden: true });
+P({ id: 'altar', name: 'Altar', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.8, 0, -0.35, 0.8, 1.05, 0.35]], top: 1.05, light: [1.6, 1.2, 0.6, 7], icon: 'table', hidden: true });
+P({ id: 'pew', name: 'Pew', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.8, 0, -0.22, 0.8, 0.5, 0.22]], top: 0.5, use: 'sit', icon: 'chair', hidden: true });
+P({ id: 'anvil_piece', name: 'Anvil', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.35, 0, -0.25, 0.35, 0.85, 0.25]], top: 0.85, icon: 'table', hidden: true });
+P({ id: 'forge', name: 'Forge', cat: 'light', snap: 'free', cost: [], boxes: [[-0.7, 0, -0.5, 0.7, 0.95, 0.5]], top: 0.95, light: [3, 1.4, 0.4, 9], icon: 'fireplace', hidden: true });
 
 export const CLAIM_RADIUS = 22;
 

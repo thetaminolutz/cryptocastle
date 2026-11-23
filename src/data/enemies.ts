@@ -31,16 +31,16 @@ export interface EnemyDef {
 }
 
 // ------------------------------------------------------------------ model helpers
-function add(b: GeoBuilder, g: THREE.BufferGeometry, color: C3, bone: number, pivot: THREE.Vector3, layer = 'white', glow = 0) {
+export function add(b: GeoBuilder, g: THREE.BufferGeometry, color: C3, bone: number, pivot: THREE.Vector3, layer = 'white', glow = 0) {
   b.add(g, { layer, color, glow, ao: (p) => 0.55 + 0.45 * Math.min(1, Math.max(0, p.y / 1.4)), uvScale: [1, 1] }, undefined, [bone, pivot]);
 }
-function ell(rx: number, ry: number, rz: number, x: number, y: number, z: number, seg = 12) {
+export function ell(rx: number, ry: number, rz: number, x: number, y: number, z: number, seg = 12) {
   const g = new THREE.SphereGeometry(1, seg, Math.max(6, Math.round(seg * 0.7))); g.scale(rx, ry, rz); g.translate(x, y, z); return g;
 }
-function cap(r: number, len: number, x: number, top: number, z: number) {
+export function cap(r: number, len: number, x: number, top: number, z: number) {
   const g = new THREE.CapsuleGeometry(r, len, 3, 8); g.translate(x, top - len / 2 - r, z); return g;
 }
-function eyes(b: GeoBuilder, x: number, y: number, z: number, r: number, color: C3, glow = 0.35, bone = 5, pivot = V()) {
+export function eyes(b: GeoBuilder, x: number, y: number, z: number, r: number, color: C3, glow = 0.35, bone = 5, pivot = V()) {
   for (const s of [-1, 1]) add(b, ell(r, r, r * 0.6, s * x, y, z, 8), color, bone, pivot, 'white', glow);
 }
 

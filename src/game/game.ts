@@ -34,6 +34,8 @@ import { Combat, STATUS_LABEL, levelWord, xpForLevel } from './combat';
 import { showDeath } from '../ui/screens';
 import { ITEMS } from '../data/items';
 import { HOTBAR, Stack } from './inventory';
+import { Villagers } from '../entities/villagers';
+import { Dialogue, biomeName } from './dialogue';
 import type { AABB } from '../world/building';
 
 const SPAWN = { x: 0.5, z: 0.5 };
@@ -69,6 +71,9 @@ export class Game {
   private lostPack: { x: number; y: number; z: number; items: (Stack | null)[] } | null = null;
   private lostMarker: THREE.Mesh;
   private dying = false;
+  readonly villagers: Villagers;
+  readonly dialogue: Dialogue;
+  private rentedBed: { x: number; y: number; z: number } | null = null;
   readonly inventory = new Inventory();
   readonly props: Props;
   readonly building: Building;
@@ -104,7 +109,8 @@ export class Game {
     this.creatures = new Creatures(this.world, this.gen, this.building, this.shadows, { strike: () => {}, toast: (t, c) => this.hotbar.notify(t, c) });
     this.lostMarker = new THREE.Mesh(new THREE.OctahedronGeometry(0.25, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.5, 2.2, 1.2) }));
     this.lostMarker.visible = false;
-    this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi, this.props.group, this.building.group, this.creatures.group, this.lostMarker);
+    this.villagers = new Villagers(ui, this.world, this.gen, this.building, this.shadows, this.creatures);
+    this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi, this.props.group, this.building.group, this.creatures.group, this.lostMarker, this.villagers.group);
     this.shadows.add(this.model.root);
     this.scene.fog = this.fog;
     this.applySettings();
@@ -133,8 +139,11 @@ export class Game {
       setAttack: (l) => this.touch.setLabel('attack', l),
       toast: (t, c) => this.hotbar.notify(t, c),
       openCrafting: () => { this.setPaused(true); this.menu.open('crafting'); },
-      openChest: (p) => { if (p.items) { this.setPaused(true); this.menu.openChest(p.items); } },
-      sleep: (p) => this.sleep(p)
+      openChest: (p) => { if (p.gen) { this.hotbar.notify('This chest belongs to someone else.', '#e08070'); return; } if (p.items) { this.setPaused(true); this.menu.openChest(p.items); } },
+      sleep: (p) => {
+        if (p.gen && !(this.rentedBed && Math.hypot(this.rentedBed.x - p.x, this.rentedBed.z - p.z) < 1.5)) { this.hotbar.notify('This bed is not yours. Rent a room from the innkeeper.', '#e08070'); return; }
+        this.sleep(p);
+      }
     });
     this.build = new BuildMode(ui, this.building, this.world, this.player, this.inventory, {
       toast: (t, c) => this.hotbar.notify(t, c),
@@ -155,9 +164,31 @@ export class Game {
     this.interaction.combat = this.combat;
     this.interaction.creatures = this.creatures;
     this.interaction.wildlife = this.wildlife;
+    this.dialogue = new Dialogue(ui, this.inventory, this.villagers, {
+      gold: () => this.gold, addGold: (n) => { this.gold = Math.max(0, this.gold + n); },
+      hours: () => this.sky.hours, day: () => this.sky.day, weather: () => this.weather.kind,
+      playerName: () => 'stranger',
+      biomeToward: (dx, dz) => biomeName(this.gen.column(Math.floor(this.player.pos.x + dx * 400), Math.floor(this.player.pos.z + dz * 400)).biome),
+      rentRoom: (n) => {
+        const bed = this.villagers.villageOf(n).layout.buildings.find((b) => b.kind === 'tavern')?.beds[0];
+        if (bed) { this.rentedBed = bed; this.building.respawn = new THREE.Vector3(bed.x, bed.y, bed.z); }
+        this.hotbar.notify('The room is yours for the night. Sleep in the tavern bed.', '#c8d8ff');
+      },
+      toast: (t, c) => this.hotbar.notify(t, c),
+      onOpen: () => { this.touch.setVisible('interact', false); },
+      onClose: () => {},
+      priceMul: () => 1
+    });
+    this.villagers.onEnterVillage = (v) => {
+      this.hud.showRegion(v.site.name, `Village · ${Math.round(this.villagers.villageRep(v.site.id)) >= 25 ? 'You are welcome here' : 'Strangers are watched here'}`);
+      void this.save();
+    };
     this.interaction.extra = () => {
       const lp = this.lostPack;
-      if (!lp || this.player.pos.distanceTo(new THREE.Vector3(lp.x, lp.y, lp.z)) > 2.5) return null;
+      if (!lp || this.player.pos.distanceTo(new THREE.Vector3(lp.x, lp.y, lp.z)) > 2.5) {
+        const npc = this.dialogue.isOpen ? null : this.villagers.talkable(this.player.pos, this.player.yaw);
+        return npc ? { label: `Talk to ${npc.name.split(' ')[0]}`, run: () => this.dialogue.open(npc) } : null;
+      }
       return { label: 'Recover your pack', run: () => {
         let lost = 0;
         for (const st of lp.items) if (st) lost += this.inventory.add(st.id, st.n);
@@ -185,6 +216,8 @@ export class Game {
       const st = d.stats!;
       this.gold = st.gold; this.combat.xp = st.xp; this.combat.level = st.level; this.player.maxLife = st.maxLife; this.creatures.kills = { ...st.kills };
       this.lostPack = d.lostPack ?? null;
+      this.villagers.saved = d.villagers ?? {};
+      this.dialogue.shops = d.shops ?? {};
     } else {
       this.inventory.add('staff', 1);
     }
@@ -228,7 +261,9 @@ export class Game {
       props: this.props.list,
       building: this.building.serialize(),
       stats: { gold: this.gold, xp: this.combat.xp, level: this.combat.level, maxLife: this.player.maxLife, kills: this.creatures.kills },
-      lostPack: this.lostPack
+      lostPack: this.lostPack,
+      villagers: this.villagers.serialize(),
+      shops: this.dialogue.shops
     };
   }
 
@@ -360,6 +395,9 @@ export class Game {
     if (this.spawned) {
       this.combat.update(dt, cam);
       this.creatures.update(dt, this.player.pos, this.sky.isNight);
+      this.villagers.update(dt, this.player.pos, this.sky.hours, cam);
+      this.villagers.tickDoors(dt);
+      if (this.dialogue.isOpen && this.player.speed > 1) this.dialogue.close();
       this.model.blocking = this.player.blocking;
       const sh = [0, 1, 2, 3, 4, 5].map((i) => this.inventory.slots[i]).find((x) => x && ITEMS[x.id].shield);
       this.model.setShield(sh ? sh.id : null);
