@@ -43,9 +43,12 @@ export class FrameStats {
     if (this.lowTime < 5) return;
     this.lowTime = 0;
     this.cooldown = 5;
-    // Order: render scale → view distance → particles
-    if (s.renderScale > 0.31) settings.set('renderScale', Math.round((s.renderScale - 0.05) * 100) / 100);
+    // Order: render scale → shadows → vegetation → view distance → particles
+    if (s.renderScale > 0.5) settings.set('renderScale', Math.round((s.renderScale - 0.05) * 100) / 100);
+    else if (s.shadows > 0) settings.set('shadows', s.shadows - 1);
+    else if (s.vegetation > 0) settings.set('vegetation', s.vegetation - 1);
     else if (s.viewDistance > 4) settings.set('viewDistance', s.viewDistance - 1);
+    else if (s.renderScale > 0.36) settings.set('renderScale', Math.round((s.renderScale - 0.05) * 100) / 100);
     else if (s.particles > 0.2) settings.set('particles', Math.round((s.particles - 0.2) * 10) / 10);
   }
 }

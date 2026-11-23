@@ -26,6 +26,25 @@ class AudioEngine {
   suspend() { if (this.ctx && this.ctx.state === 'running') void this.ctx.suspend(); }
   resume() { if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume(); }
 
+  /** Distant rolling thunder (filtered noise). */
+  thunder() {
+    const ctx = this.ctx, out = this.master;
+    if (!ctx || !out) return;
+    const len = 3.5, buf = ctx.createBuffer(1, ctx.sampleRate * len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let v = 0;
+    for (let i = 0; i < d.length; i++) { v = v * 0.985 + (Math.random() * 2 - 1) * 0.015; d[i] = v * 6; }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 180;
+    const g = ctx.createGain();
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.9 * settings.values.ambienceVolume, t + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    src.connect(lp).connect(g).connect(out);
+    src.start(t);
+  }
+
   /** Low heartbeat thump – used in the opening. */
   heartbeat() {
     const ctx = this.ctx, out = this.master;

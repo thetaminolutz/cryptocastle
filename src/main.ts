@@ -25,9 +25,17 @@ function startGame() {
   audio.heartbeat();
   const params = new URLSearchParams(location.search);
   const seed = params.has('seed') ? seedFromString(params.get('seed')!) : seedFromString('duskmere');
-  game = new Game(canvas, uiRoot, seed);
-  game.start();
-  (window as unknown as { __game: Game }).__game = game;
+  const loading = document.createElement('div');
+  loading.className = 'loading';
+  loading.textContent = 'THE WORLD STIRS…';
+  uiRoot.appendChild(loading);
+  // let the loading text paint before generating textures
+  setTimeout(() => {
+    game = new Game(canvas, uiRoot, seed);
+    game.start();
+    (window as unknown as { __game: Game }).__game = game;
+    setTimeout(() => loading.remove(), 1200);
+  }, 50);
 }
 
 function title() { showTitle(() => showEnter(startGame, title)); }

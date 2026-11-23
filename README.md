@@ -13,12 +13,27 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M1 Project setup, PWA, icons, touch-safe CSS, FPS counter | ✅ done |
 | M2 World engine (worker chunk gen, atlas, low-res pixel pass, fog, day/night) | ✅ done |
 | M3 Smooth terrain + player & touch controls (walk, sprint, jump, climb, swim, dodge, stamina, life, 1st/3rd person) | ✅ done |
-| M4 Biomes, plants, animals, caves, ores, weather | next |
+| M4 Biomes, plants, animals, caves, ores, weather + realistic graphics overhaul | ✅ done |
+| M5 Gathering, inventory, hotbar, crafting, tools, saving | next |
 | M4–M15 | see the feature bible |
 
-The world is **smooth** (no cubes): terrain is a density field meshed with
-Surface Nets, water is a flat waving surface, trees are smooth low-poly models.
-Surfaces keep crisp pixel-art textures and the low-res pixel render.
+The world is **smooth and realistic**: terrain is a density field meshed with
+Surface Nets and textured with procedural 128 px materials + normal maps
+(tri-planar, blended between materials), lit by a sun/moon with soft shadows,
+filmic tone mapping, height fog, an atmospheric sky with clouds, stars and moon
+phases, and reflective water with shore foam. Trees are built from leaf-cluster
+cards; grass, flowers, ferns, reeds, rocks and mushrooms sway in the wind.
+A retro "pixel look" can still be switched on in Settings.
+
+**World content (M4):** 14 biomes that blend into each other (Moonlit Forest,
+Sunny Meadows, Dark Pine Forest, Misty Swamp, Red Desert with mesas and canyons,
+Snowy Mountains, Frozen Tundra, Volcanic Ashlands with lava pools, Mushroom Grove,
+Coastal Cliffs, Haunted Moor, Sunken Forest, Floating Rocks, plus ocean/beaches)
+and the underground Crystal Caves. Caves with entrances, ravines, ores (coal,
+copper, iron, silver, gold, mithril, moonstone). Named regions with a danger
+level that rises with distance. Wildlife: deer, rabbits, boars, wolves, bears,
+sheep, goats, horses, birds and fish. Weather per biome: rain, thunderstorms,
+fog, snow, sandstorms, fireflies on warm nights.
 
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera, **Jump** (tap; hold against a steep wall or a tree to
@@ -84,19 +99,25 @@ scripts/     icon generator (pixel-art PNGs, run automatically on build)
   append its tile name to `TILE_NAMES` in `src/world/tiles.ts`, then append a row
   to `BLOCKS` in `src/world/blocks.ts` (top tile = flat ground, side tile = steep
   slopes). Never renumber existing IDs (saves store them).
-- **A new tree kind:** add a model in `buildKind()` in `src/world/trees.ts` and
-  place it in `placeTrees()` in `src/world/terrain.ts`.
+- **A new biome:** add a row to `BIOMES` in `src/world/biomes.ts` (materials,
+  trees, plants, animals, weather, fog) and, if it needs its own terrain shape,
+  a case in `biomeHeight()` in `src/world/terrain.ts`.
+- **A new tree or plant:** add a model in `buildTree()` / `buildPlant()` in
+  `src/world/vegetation.ts` and list it in a biome's `trees` / `plants`.
+- **A new texture:** add a painter to `PAINTERS` in `src/world/textures.ts`.
+- **A new animal:** add a model + behaviour row to `SPECIES` in
+  `src/entities/animals.ts` and list it in a biome's `animals`.
 - **Player tuning** (speeds, stamina costs, fall damage): `PLAYER_TUNING` in
   `src/entities/player.ts`.
 - Items, enemies, NPCs and quests will live as data tables in `src/data/`.
 
 ## Performance notes
 
-- 3D is rendered at ~45 % of the physical screen resolution and upscaled with
-  nearest-neighbour; the UI stays sharp.
+- 3D renders at a fraction of the physical screen resolution (Low 45 %,
+  Medium 62 %, High 80 %) with MSAA and is upscaled; the UI stays sharp.
+- Trees and plants are instanced (one draw call per kind), culled to the view,
+  and only nearby ones are drawn into the shadow map.
 - Chunks are 16×16×128 density samples, generated and meshed (Surface Nets) in
-  Web Workers: one terrain and one liquid mesh per chunk; all trees are drawn
-  with 3 instanced draw calls. View distance 6 ≈ 90–120 draw calls and
-  ~200–280 k triangles.
-- If FPS stays under 45 for 5 s, the game lowers render scale, then view
-  distance, then particles (Settings → Auto quality).
+  Web Workers: one terrain and one liquid mesh per chunk.
+- If FPS stays under 45 for 5 s, the game lowers render scale, then shadows,
+  then grass, then view distance, then particles (Settings → Auto quality).

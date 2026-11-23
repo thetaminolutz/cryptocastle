@@ -6,15 +6,21 @@
 // Each quad takes the material of the solid end of its edge. Normals come from the
 // density gradient, so shading is smooth and seamless across chunk borders.
 import { BLOCKS, B } from './blocks';
-import { BLOCK_TILES } from './tiles';
 import { CHUNK_HEIGHT, CHUNK_SIZE } from './constants';
 import { PAD, PAD_LAYER, PAD_VOLUME, pIdx, SOLID_MIN, WATER_SURFACE_OFFSET } from './terrain';
 
-export interface MeshData {
+/** Terrain: non-indexed triangles. Each vertex carries the 3 materials of its
+ *  triangle so the shader can blend them with barycentric weights (gl_VertexID). */
+export interface TerrainMesh {
   positions: Float32Array;
   normals: Int8Array;     // normalized
-  tiles: Uint8Array;      // top tile, side tile
+  mats: Uint8Array;       // 3 material ids per vertex
   light: Uint8Array;      // ao (0..255), sky (0..15), block (0..15)
+}
+/** Liquids: indexed quads. data = kind (0 water, 1 lava, 2 ice), depth*20, sky, block */
+export interface LiquidMesh {
+  positions: Float32Array;
+  data: Uint8Array;
   indices: Uint16Array | Uint32Array;
 }
 
@@ -68,20 +74,6 @@ export function computeLight(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, 
   spread(blk);
 }
 
-class Builder {
-  pos: number[] = []; nrm: number[] = []; tiles: number[] = []; light: number[] = []; idx: number[] = [];
-  vcount = 0;
-  build(): MeshData {
-    return {
-      positions: new Float32Array(this.pos),
-      normals: new Int8Array(this.nrm),
-      tiles: new Uint8Array(this.tiles),
-      light: new Uint8Array(this.light),
-      indices: this.vcount > 65535 ? new Uint32Array(this.idx) : new Uint16Array(this.idx)
-    };
-  }
-}
-
 // cells span grid points c..c+1; we need cells -1..15 in x/z and 0..H-2 in y
 const CELLS_XZ = CHUNK_SIZE + 1;
 const cellIdx = (cx: number, cy: number, cz: number) => (cx + 1) + (cz + 1) * CELLS_XZ + cy * CELLS_XZ * CELLS_XZ;
@@ -93,11 +85,15 @@ const CUBE_EDGES = [
 ];
 // corner k: x = k&1, y = (k>>1)&1, z = (k>>2)&1
 
-export function meshSmooth(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, blk: Uint8Array): { terrain: MeshData; liquid: MeshData } {
+const dist2 = (v: Float32Array, a: number, b: number) =>
+  (v[a * 3] - v[b * 3]) ** 2 + (v[a * 3 + 1] - v[b * 3 + 1]) ** 2 + (v[a * 3 + 2] - v[b * 3 + 2]) ** 2;
+
+export function meshSmooth(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, blk: Uint8Array): { terrain: TerrainMesh; liquid: LiquidMesh } {
   const nCells = CELLS_XZ * CELLS_XZ * (CHUNK_HEIGHT - 1);
   const vx = new Float32Array(nCells * 3);
   const vn = new Float32Array(nCells * 3);
   const vlight = new Uint8Array(nCells * 3);
+  const vmat = new Uint8Array(nCells);
   const has = new Uint8Array(nCells);
   const cd = new Float32Array(8);
 
@@ -154,13 +150,31 @@ export function meshSmooth(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, bl
         const frac = solid / total;
         const ao = Math.max(0.42, Math.min(1, 1 - (frac - 0.5) * 1.5));
         vlight[ci * 3] = Math.round(ao * 255); vlight[ci * 3 + 1] = sl; vlight[ci * 3 + 2] = bl;
+        // material: the top-most solid corner (surfaces show their top layer)
+        let best = -1, bm = 0;
+        for (let k = 0; k < 8; k++) {
+          if (!(mask & (1 << k))) continue;
+          const ky = (k >> 1) & 1;
+          const score = ky * 2 + cd[k] / 128;
+          if (score > best) { best = score; bm = mat[pIdx(cx + (k & 1), cy + ky, cz + ((k >> 2) & 1))]; }
+        }
+        vmat[ci] = bm;
       }
     }
   }
 
-  // ---- 2. one quad per sign-changing grid edge owned by this chunk
-  const terrain = new Builder();
+  // ---- 2. one quad (two triangles) per sign-changing grid edge owned by this chunk
+  const pos: number[] = [], nrm: number[] = [], mats: number[] = [], light: number[] = [];
   const quad = [0, 0, 0, 0];
+  const tri = (a: number, b: number, c: number) => {
+    const ma = vmat[a], mb = vmat[b], mc = vmat[c];
+    for (const ci of [a, b, c]) {
+      pos.push(vx[ci * 3], vx[ci * 3 + 1], vx[ci * 3 + 2]);
+      nrm.push(Math.round(vn[ci * 3] * 127), Math.round(vn[ci * 3 + 1] * 127), Math.round(vn[ci * 3 + 2] * 127));
+      mats.push(ma, mb, mc);
+      light.push(vlight[ci * 3], vlight[ci * 3 + 1], vlight[ci * 3 + 2]);
+    }
+  };
   for (let y = 0; y < CHUNK_HEIGHT - 1; y++) {
     for (let z = 0; z < CHUNK_SIZE; z++) {
       for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -168,10 +182,8 @@ export function meshSmooth(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, bl
         const s0 = den[i0] >= SOLID_MIN;
         for (let axis = 0; axis < 3; axis++) {
           const x1 = x + (axis === 0 ? 1 : 0), y1 = y + (axis === 1 ? 1 : 0), z1 = z + (axis === 2 ? 1 : 0);
-          const i1 = pIdx(x1, y1, z1);
-          const s1 = den[i1] >= SOLID_MIN;
+          const s1 = den[pIdx(x1, y1, z1)] >= SOLID_MIN;
           if (s0 === s1) continue;
-          // the 4 cells around this edge, ordered so the winding faces +axis
           const u = (axis + 1) % 3, v = (axis + 2) % 3;
           const p = [x, y, z];
           let ok = true;
@@ -185,32 +197,41 @@ export function meshSmooth(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, bl
             quad[c] = ci;
           }
           if (!ok) continue;
-          const m = s0 ? mat[i0] : mat[i1];
-          const top = BLOCK_TILES[m * 3], side = BLOCK_TILES[m * 3 + 1];
-          const base = terrain.vcount;
-          for (let c = 0; c < 4; c++) {
-            const ci = quad[c];
-            terrain.pos.push(vx[ci * 3], vx[ci * 3 + 1], vx[ci * 3 + 2]);
-            terrain.nrm.push(Math.round(vn[ci * 3] * 127), Math.round(vn[ci * 3 + 1] * 127), Math.round(vn[ci * 3 + 2] * 127));
-            terrain.tiles.push(top, side);
-            terrain.light.push(vlight[ci * 3], vlight[ci * 3 + 1], vlight[ci * 3 + 2]);
+          // split along the shorter diagonal for nicer shading
+          const d02 = dist2(vx, quad[0], quad[2]), d13 = dist2(vx, quad[1], quad[3]);
+          const [a, b, c, d] = quad;
+          if (s0) {
+            if (d02 <= d13) { tri(a, b, c); tri(a, c, d); } else { tri(b, c, d); tri(b, d, a); }
+          } else {
+            if (d02 <= d13) { tri(a, c, b); tri(a, d, c); } else { tri(b, d, c); tri(b, a, d); }
           }
-          terrain.vcount += 4;
-          // solid at the low end → surface faces +axis
-          if (s0) terrain.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-          else terrain.idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
         }
       }
     }
   }
-
-  return { terrain: terrain.build(), liquid: meshLiquids(den, mat, sky, blk) };
+  const terrain: TerrainMesh = {
+    positions: new Float32Array(pos), normals: new Int8Array(nrm), mats: new Uint8Array(mats), light: new Uint8Array(light)
+  };
+  return { terrain, liquid: meshLiquids(den, mat, sky, blk) };
 }
 
 /** Flat liquid surfaces (water, lava, ice) at the top of each liquid column. */
-function meshLiquids(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, blk: Uint8Array): MeshData {
-  const out = new Builder();
+function meshLiquids(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, blk: Uint8Array): LiquidMesh {
+  const pos: number[] = [], data: number[] = [], idx: number[] = [];
+  let vcount = 0;
   const isLiquid = (m: number) => m === B.WATER || m === B.LAVA || m === B.ICE;
+  /** water depth below level `y` in grid column (x,z), metres */
+  const depthAt = (x: number, y: number, z: number) => {
+    if (x < -1 || x > CHUNK_SIZE || z < -1 || z > CHUNK_SIZE) return 0;
+    let prev = den[pIdx(x, y, z)];
+    if (prev >= SOLID_MIN) return 0;
+    for (let yy = y - 1; yy >= 0 && y - yy < 12; yy--) {
+      const v = den[pIdx(x, yy, z)];
+      if (v >= SOLID_MIN) { const f = (prev - 127.5) / (prev - v); return y - (yy + 1 - f) + WATER_SURFACE_OFFSET; }
+      prev = v;
+    }
+    return 12;
+  };
   for (let y = 1; y < CHUNK_HEIGHT - 1; y++) {
     for (let z = 0; z < CHUNK_SIZE; z++) {
       for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -222,7 +243,7 @@ function meshLiquids(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, blk: Uin
           // extend the surface one step under the shore so it meets the terrain
           if (den[i] < SOLID_MIN) continue;
           let nb = 0;
-          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
             const j = mat[pIdx(x + dx, y, z + dz)];
             if (isLiquid(j) && den[pIdx(x + dx, y + 1, z + dz)] < SOLID_MIN && !isLiquid(mat[pIdx(x + dx, y + 1, z + dz)])) nb = j;
           }
@@ -230,19 +251,21 @@ function meshLiquids(den: Uint8Array, mat: Uint8Array, sky: Uint8Array, blk: Uin
           m = nb;
         }
         const h = y + WATER_SURFACE_OFFSET;
-        const tile = BLOCK_TILES[m * 3];
-        const base = out.vcount;
-        const corners = [[x - 0.5, z - 0.5], [x + 0.5, z - 0.5], [x + 0.5, z + 0.5], [x - 0.5, z + 0.5]];
-        for (const [px, pz] of corners) {
-          out.pos.push(px, h, pz);
-          out.nrm.push(0, 127, 0);
-          out.tiles.push(tile, tile);
-          out.light.push(255, sky[above], Math.max(blk[above], m === B.LAVA ? 15 : 0));
+        const kind = m === B.LAVA ? 1 : m === B.ICE ? 2 : 0;
+        const base = vcount;
+        for (const [dx, dz] of [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]) {
+          const sx = dx < 0 ? -1 : 1, sz = dz < 0 ? -1 : 1;
+          const depth = (depthAt(x, y, z) + depthAt(x + sx, y, z) + depthAt(x, y, z + sz) + depthAt(x + sx, y, z + sz)) / 4;
+          pos.push(x + dx, h, z + dz);
+          data.push(kind, Math.min(255, Math.round(depth * 20)), sky[above], Math.max(blk[above], kind === 1 ? 15 : 0));
         }
-        out.vcount += 4;
-        out.idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+        vcount += 4;
+        idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
       }
     }
   }
-  return out.build();
+  return {
+    positions: new Float32Array(pos), data: new Uint8Array(data),
+    indices: vcount > 65535 ? new Uint32Array(idx) : new Uint16Array(idx)
+  };
 }

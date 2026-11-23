@@ -13,7 +13,7 @@ export class PlayerModel {
   private rollSpin = 0;
 
   constructor() {
-    const cloth = new THREE.MeshLambertMaterial({ color: 0x5e4e3e });
+    const cloth = new THREE.MeshLambertMaterial({ color: 0x4e3e30 });
     const clothDark = new THREE.MeshLambertMaterial({ color: 0x3f342b });
     const skin = new THREE.MeshLambertMaterial({ color: 0xcfc6bb });
     const wood = new THREE.MeshLambertMaterial({ color: 0x6a4a2c });

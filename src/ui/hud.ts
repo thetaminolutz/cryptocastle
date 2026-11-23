@@ -12,6 +12,8 @@ export class Hud {
   private breathFill: HTMLDivElement;
   private gold: HTMLDivElement;
   private flash: HTMLDivElement;
+  private banner: HTMLDivElement;
+  private bannerTimer = 0;
   private last = '';
 
   constructor(parent: HTMLElement, onMenu: () => void, onView: () => void) {
@@ -46,8 +48,22 @@ export class Hud {
     };
     const menu = btn('menu-btn', '☰', onMenu);
     const view = btn('menu-btn view-btn', '◐', onView);
-    this.root.append(this.flash, this.top, bars, menu, view);
+    this.banner = document.createElement('div');
+    this.banner.className = 'region-banner';
+    const vignette = document.createElement('div');
+    vignette.className = 'vignette';
+    this.root.append(vignette, this.flash, this.banner, this.top, bars, menu, view);
     parent.appendChild(this.root);
+  }
+
+  showRegion(name: string, subtitle: string) {
+    this.banner.innerHTML = '';
+    const t = document.createElement('span'); t.textContent = name;
+    const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = subtitle;
+    this.banner.append(t, sub);
+    this.banner.style.opacity = '1';
+    clearTimeout(this.bannerTimer);
+    this.bannerTimer = window.setTimeout(() => { this.banner.style.opacity = '0'; }, 4200);
   }
 
   hurt() {

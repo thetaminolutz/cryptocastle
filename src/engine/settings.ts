@@ -6,9 +6,11 @@ export type QualityPreset = 'low' | 'medium' | 'high';
 export interface Settings {
   quality: QualityPreset;
   viewDistance: number;   // chunks, 4..10
-  renderScale: number;    // 0.3..0.75 of screen resolution
+  renderScale: number;    // 0.35..1 of physical screen resolution
   fpsCap: 30 | 60;
-  shadows: boolean;
+  shadows: number;        // 0 off, 1 medium, 2 high
+  vegetation: number;     // 0 low, 1 medium, 2 high (grass distance/density)
+  pixelLook: boolean;     // retro nearest-neighbour upscale
   showFps: boolean;
   autoQuality: boolean;
   particles: number;      // 0..1
@@ -22,17 +24,18 @@ export interface Settings {
   leftHanded: boolean;
 }
 
-export const PRESETS: Record<QualityPreset, Pick<Settings, 'viewDistance' | 'renderScale' | 'particles' | 'shadows'>> = {
-  low: { viewDistance: 4, renderScale: 0.35, particles: 0.4, shadows: false },
-  medium: { viewDistance: 6, renderScale: 0.45, particles: 0.75, shadows: false },
-  high: { viewDistance: 8, renderScale: 0.55, particles: 1, shadows: false }
+export const PRESETS: Record<QualityPreset, Pick<Settings, 'viewDistance' | 'renderScale' | 'particles' | 'shadows' | 'vegetation'>> = {
+  low: { viewDistance: 4, renderScale: 0.45, particles: 0.4, shadows: 0, vegetation: 0 },
+  medium: { viewDistance: 6, renderScale: 0.62, particles: 0.75, shadows: 1, vegetation: 1 },
+  high: { viewDistance: 8, renderScale: 0.8, particles: 1, shadows: 2, vegetation: 2 }
 };
 
 const DEFAULTS: Settings = {
   quality: 'medium',
   ...PRESETS.medium,
   fpsCap: 60,
-  showFps: true,
+  pixelLook: false,
+  showFps: false,
   autoQuality: true,
   masterVolume: 0.8,
   musicVolume: 0.6,
@@ -44,7 +47,7 @@ const DEFAULTS: Settings = {
   leftHanded: false
 };
 
-const KEY = 'duskmere.settings.v1';
+const KEY = 'duskmere.settings.v2';
 type Listener = (s: Settings, changed: keyof Settings) => void;
 
 class SettingsStore {
@@ -71,6 +74,7 @@ class SettingsStore {
     this.set('renderScale', v.renderScale);
     this.set('particles', v.particles);
     this.set('shadows', v.shadows);
+    this.set('vegetation', v.vegetation);
   }
 
   onChange(l: Listener) { this.listeners.push(l); }

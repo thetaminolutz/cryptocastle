@@ -5,10 +5,20 @@
 import * as THREE from 'three';
 import { CHUNK_HEIGHT, CHUNK_SIZE, chunkKey, vIndex } from './constants';
 import type { WorkerRequest, WorkerResult } from './chunk-worker';
-import type { MeshData } from './smooth-mesher';
-import { decodeDensity, TREE_STRIDE, WATER_SURFACE_OFFSET, TreeKind } from './terrain';
-import { TreeRenderer, TREE_TRUNK } from './trees';
+import type { TerrainMesh, LiquidMesh } from './smooth-mesher';
+import { decodeDensity, TREE_STRIDE, WATER_SURFACE_OFFSET } from './terrain';
+import { Vegetation } from './vegetation';
+import { Tree } from './biomes';
 import { B } from './blocks';
+import type { ShadowSystem } from '../engine/shadows';
+
+/** Trunk collision radius / height per tree kind (before instance scale). */
+const TRUNK: Record<number, { r: number; h: number }> = {
+  [Tree.Oak]: { r: 0.4, h: 4.5 }, [Tree.DarkOak]: { r: 0.5, h: 5.5 }, [Tree.Birch]: { r: 0.22, h: 7 },
+  [Tree.Pine]: { r: 0.32, h: 10 }, [Tree.SnowPine]: { r: 0.32, h: 10 }, [Tree.Dead]: { r: 0.35, h: 6 },
+  [Tree.GiantMushroom]: { r: 0.72, h: 6 }, [Tree.Palm]: { r: 0.28, h: 7 }, [Tree.CrystalTree]: { r: 0.6, h: 3 },
+  [Tree.Cactus]: { r: 0.4, h: 3.4 }, [Tree.Willow]: { r: 0.5, h: 4 }
+};
 import ChunkWorker from './chunk-worker?worker';
 
 export interface Chunk {
@@ -16,6 +26,7 @@ export interface Chunk {
   density: Uint8Array;
   material: Uint8Array;
   trees: Float32Array;
+  plants: Float32Array;
   terrain: THREE.Mesh | null;
   liquid: THREE.Mesh | null;
 }
@@ -27,7 +38,7 @@ const LRU_MAX = 48;
 export class World {
   readonly group = new THREE.Group();
   readonly chunks = new Map<string, Chunk>();
-  readonly trees: TreeRenderer;
+  readonly vegetation: Vegetation;
   private cache = new Map<string, Chunk>();
   private pending = new Map<string, number>();
   private ready: WorkerResult[] = [];
@@ -40,10 +51,10 @@ export class World {
   viewDistance: number;
   stats = { genMs: 0, loaded: 0 };
 
-  constructor(readonly seed: number, viewDistance: number, private matTerrain: THREE.Material, private matLiquid: THREE.Material) {
+  constructor(readonly seed: number, viewDistance: number, private matTerrain: THREE.Material, private matLiquid: THREE.Material, private shadows: ShadowSystem) {
     this.viewDistance = viewDistance;
-    this.trees = new TreeRenderer(matTerrain);
-    this.group.add(this.trees.group);
+    this.vegetation = new Vegetation(shadows);
+    this.group.add(this.vegetation.group);
     const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
     for (let i = 0; i < n; i++) {
       const w = new ChunkWorker();
@@ -56,7 +67,7 @@ export class World {
 
   setViewDistance(d: number) { this.viewDistance = d; this.lastCenter = ''; }
 
-  update(pos: THREE.Vector3, forward: THREE.Vector3) {
+  update(dt: number, pos: THREE.Vector3, forward: THREE.Vector3, camera?: THREE.PerspectiveCamera) {
     const pcx = Math.floor(pos.x / CHUNK_SIZE), pcz = Math.floor(pos.z / CHUNK_SIZE);
     const center = `${pcx},${pcz},${this.viewDistance}`;
     if (center !== this.lastCenter) {
@@ -66,7 +77,7 @@ export class World {
     }
     this.dispatch();
     this.applyReady(3);
-    this.trees.update();
+    this.vegetation.update(dt, pos, camera);
   }
 
   private recomputeWanted(pcx: number, pcz: number, fwd: THREE.Vector3) {
@@ -99,7 +110,8 @@ export class World {
         this.cache.delete(key);
         this.chunks.set(key, cached);
         for (const m of [cached.terrain, cached.liquid]) if (m) this.group.add(m);
-        this.trees.setChunk(key, cached.trees);
+        if (cached.terrain) this.shadows.add(cached.terrain);
+        this.vegetation.setChunk(key, cached.trees, cached.plants);
         continue;
       }
       const job = this.jobSeq++;
@@ -118,25 +130,19 @@ export class World {
       this.pending.delete(key);
       this.stats.genMs = this.stats.genMs * 0.9 + r.ms * 0.1;
       const chunk: Chunk = {
-        cx: r.cx, cz: r.cz, density: r.density, material: r.material, trees: r.trees,
-        terrain: this.makeMesh(r.terrain, this.matTerrain, r.cx, r.cz, 0),
-        liquid: this.makeMesh(r.liquid, this.matLiquid, r.cx, r.cz, 1)
+        cx: r.cx, cz: r.cz, density: r.density, material: r.material, trees: r.trees, plants: r.plants,
+        terrain: this.makeTerrain(r.terrain, r.cx, r.cz),
+        liquid: this.makeLiquid(r.liquid, r.cx, r.cz)
       };
       this.chunks.set(key, chunk);
-      this.trees.setChunk(key, r.trees);
+      if (chunk.terrain) this.shadows.add(chunk.terrain);
+      this.vegetation.setChunk(key, r.trees, r.plants);
       n++;
     }
     this.stats.loaded = this.chunks.size;
   }
 
-  private makeMesh(m: MeshData, mat: THREE.Material, cx: number, cz: number, order: number): THREE.Mesh | null {
-    if (m.indices.length === 0) return null;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
-    g.setAttribute('aNormal', new THREE.BufferAttribute(m.normals, 3, true));
-    g.setAttribute('aTiles', new THREE.BufferAttribute(m.tiles, 2));
-    g.setAttribute('aLight', new THREE.BufferAttribute(m.light, 3));
-    g.setIndex(new THREE.BufferAttribute(m.indices, 1));
+  private place(g: THREE.BufferGeometry, mat: THREE.Material, cx: number, cz: number, order: number) {
     g.computeBoundingBox();
     g.computeBoundingSphere();
     const mesh = new THREE.Mesh(g, mat);
@@ -148,14 +154,34 @@ export class World {
     return mesh;
   }
 
+  private makeTerrain(m: TerrainMesh, cx: number, cz: number): THREE.Mesh | null {
+    if (m.positions.length === 0) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
+    g.setAttribute('aNormal', new THREE.BufferAttribute(m.normals, 3, true));
+    g.setAttribute('aMats', new THREE.BufferAttribute(m.mats, 3));
+    g.setAttribute('aLight', new THREE.BufferAttribute(m.light, 3));
+    return this.place(g, this.matTerrain, cx, cz, 0);
+  }
+
+  private makeLiquid(m: LiquidMesh, cx: number, cz: number): THREE.Mesh | null {
+    if (m.indices.length === 0) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
+    g.setAttribute('aData', new THREE.BufferAttribute(m.data, 4));
+    g.setIndex(new THREE.BufferAttribute(m.indices, 1));
+    return this.place(g, this.matLiquid, cx, cz, 1);
+  }
+
   private unloadFar(pcx: number, pcz: number) {
     const r = this.viewDistance + 1.5;
     for (const [key, c] of this.chunks) {
       const dx = c.cx - pcx, dz = c.cz - pcz;
       if (dx * dx + dz * dz <= r * r) continue;
       for (const m of [c.terrain, c.liquid]) if (m) this.group.remove(m);
+      if (c.terrain) this.shadows.remove(c.terrain);
       this.chunks.delete(key);
-      this.trees.removeChunk(key);
+      this.vegetation.removeChunk(key);
       if (this.lastChunk === c) this.lastChunk = null;
       this.cache.set(key, c);
       if (this.cache.size > LRU_MAX) {
@@ -249,6 +275,17 @@ export class World {
     return 0;
   }
 
+  /** Ground height near an expected height (cheap: searches a few metres). */
+  groundNear(x: number, z: number, yGuess: number): number {
+    let prev = this.density(x, yGuess + 4, z);
+    for (let y = yGuess + 3.5; y > yGuess - 8; y -= 0.5) {
+      const d = this.density(x, y, z);
+      if (d > 0 && prev <= 0) return y + 0.5 * (d / (d - prev));
+      prev = d;
+    }
+    return this.groundY(x, z);
+  }
+
   /** Tree trunks within range of (x,z). */
   treesNear(x: number, z: number, range: number, out: TreeHit[]): TreeHit[] {
     out.length = 0;
@@ -261,7 +298,7 @@ export class World {
       for (let i = 0; i < t.length; i += TREE_STRIDE) {
         const dx = t[i] - x, dz = t[i + 2] - z;
         if (dx * dx + dz * dz > range * range) continue;
-        const k = TREE_TRUNK[t[i + 3] as TreeKind], s = t[i + 4];
+        const k = TRUNK[t[i + 3]], s = t[i + 4];
         out.push({ x: t[i], z: t[i + 2], r: k.r * s, y0: t[i + 1], y1: t[i + 1] + k.h * s });
       }
     }

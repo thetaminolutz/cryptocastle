@@ -10,10 +10,13 @@ type Row =
 const ROWS: Row[] = [
   { kind: 'select', key: 'quality', label: 'Quality preset', options: [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']] },
   { kind: 'range', key: 'viewDistance', label: 'View distance (chunks)', min: 4, max: 10, step: 1 },
-  { kind: 'range', key: 'renderScale', label: 'Render scale', min: 0.3, max: 0.75, step: 0.05 },
+  { kind: 'range', key: 'renderScale', label: 'Render scale', min: 0.35, max: 1, step: 0.05 },
+  { kind: 'select', key: 'shadows', label: 'Shadows', options: [['0', 'Off'], ['1', 'Medium'], ['2', 'High']] },
+  { kind: 'select', key: 'vegetation', label: 'Grass & plants', options: [['0', 'Low'], ['1', 'Medium'], ['2', 'High']] },
+  { kind: 'range', key: 'particles', label: 'Weather particles', min: 0, max: 1, step: 0.1 },
+  { kind: 'toggle', key: 'pixelLook', label: 'Retro pixel look' },
   { kind: 'select', key: 'fpsCap', label: 'FPS cap', options: [['60', '60'], ['30', '30']] },
   { kind: 'toggle', key: 'autoQuality', label: 'Auto quality (heat / FPS)' },
-  { kind: 'toggle', key: 'shadows', label: 'Shadows: low' },
   { kind: 'toggle', key: 'showFps', label: 'Show FPS counter' },
   { kind: 'range', key: 'masterVolume', label: 'Master volume', min: 0, max: 1, step: 0.05 },
   { kind: 'range', key: 'musicVolume', label: 'Music volume', min: 0, max: 1, step: 0.05 },
@@ -50,7 +53,7 @@ export function openSettings(parent: HTMLElement, onClose: () => void) {
       }
       sel.addEventListener('change', () => {
         if (row.key === 'quality') settings.applyPreset(sel.value as QualityPreset);
-        else if (row.key === 'fpsCap') settings.set('fpsCap', Number(sel.value) as 30 | 60);
+        else settings.set(row.key, Number(sel.value) as never);
         refreshers.forEach((f) => f());
       });
       refreshers.push(() => { sel.value = String(v[row.key]); });
