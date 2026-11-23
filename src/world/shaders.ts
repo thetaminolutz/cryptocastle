@@ -409,6 +409,9 @@ void main() {
 `;
 
 const PROP_FRAG = /* glsl */`
+#ifdef GHOST
+uniform vec4 uGhost;
+#endif
 in vec3 vWorld;
 in vec3 vNormal;
 in vec2 vUv;
@@ -451,6 +454,9 @@ void main() {
   col += albedo * pointLights(vWorld, n) * vAo;
   col += albedo * vLayerTint.z * (1.0 + uNight * 2.0);
   gl_FragColor = vec4(applyFog(col, vWorld), outA);
+  #ifdef GHOST
+    gl_FragColor = vec4(mix(col, uGhost.rgb, 0.6), uGhost.a);
+  #endif
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   #endif
@@ -472,15 +478,17 @@ export function liquidMaterial() {
   return mk(LIQUID_VERT, LIQUID_FRAG, { transparent: true, depthWrite: false, side: THREE.DoubleSide });
 }
 
-export interface PropMaterialOpts { alphaTest?: boolean; plant?: boolean; animal?: boolean; doubleSide?: boolean; }
+export interface PropMaterialOpts { alphaTest?: boolean; plant?: boolean; animal?: boolean; doubleSide?: boolean; ghost?: THREE.Vector4; }
 export function propMaterial(o: PropMaterialOpts, shadowPass = false, radius = 30) {
   const defines: Record<string, string> = {};
   if (o.alphaTest) defines.ALPHA_TEST = '';
   if (o.plant) defines.PLANT = '';
   if (o.animal) defines.ANIMAL = '';
+  if (o.ghost) defines.GHOST = '';
   if (shadowPass) defines.SHADOW_PASS = '';
   const m = mk(PROP_VERT, PROP_FRAG, { side: o.doubleSide ? THREE.DoubleSide : THREE.FrontSide }, defines);
   m.uniforms.uVegRadius = { value: radius };
+  if (o.ghost) { m.uniforms.uGhost = { value: o.ghost }; m.transparent = true; m.depthWrite = false; }
   if (o.alphaTest && !shadowPass) m.alphaToCoverage = true;
   if (shadowPass) m.colorWrite = false;
   return m;

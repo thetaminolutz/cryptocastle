@@ -15,7 +15,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M3 Smooth terrain + player & touch controls (walk, sprint, jump, climb, swim, dodge, stamina, life, 1st/3rd person) | ✅ done |
 | M4 Biomes, plants, animals, caves, ores, weather + realistic graphics overhaul | ✅ done |
 | M5 Gathering, inventory, hotbar, crafting, tools, saving + skinned hero character | ✅ done |
-| M6 Building mode, furniture, chests, beds, land claims | next |
+| M6 Building mode, furniture, chests, beds, land claims, blueprints | ✅ done |
+| M7 Combat, first 10 enemies, loot, death/respawn, game modes | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -51,13 +52,24 @@ long-press info and stack splitting. Saves: 3 journeys in IndexedDB, autosave
 every 2 min and when leaving the app, export/import as a file. Only changes to
 the world are saved; the rest regenerates from the seed.
 
+**Building (M6):** tap ⚒ for build mode. Pieces snap to a 2 m grid: wooden and
+stone floors, walls, half walls, window walls, doors (open/close), gables, shingle
+and thatch roofs, stairs, pillars, fences, brick walls. Furniture: bed (respawn
+point; sleep through the night), chest (16-slot storage), table, chair (sit),
+shelf, carpet, banner, painting, weapon rack, plant pot, boundary stone (land
+claim). Light: fireplace, wall torch, lantern. A ghost preview shows green when
+placeable and red when blocked or missing materials; Rotate, hold Place to repeat,
+Remove (full refund), Undo (20 steps). **Plans:** lay out a hut, cottage or
+longhouse as a blueprint, then tap "Build plans" to raise every piece you have
+materials for. A lit, claimed plot keeps predators (and later monsters) away.
+
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera, **Strike/Mine/Chop/Dig** (hold to keep swinging),
 **Use** (appears when something is in reach: harvest, place, drink, use station),
 **Jump** (hold against a wall or tree to climb; in water: swim up), **Dodge** = roll.
 Tap a belt slot to hold it. ◐ toggles first/third person, ☰ opens the menu
 (Pack, Craft, Settings, Save).
-Keyboard: WASD, Shift sprint, Space jump/climb, F strike, E use, Q dodge, 1–6 belt.
+Keyboard: WASD, Shift sprint, Space jump/climb, F strike (place in build mode), E use, Q dodge, 1–6 belt, B build mode, R rotate.
 
 ## Run locally
 
@@ -122,6 +134,8 @@ scripts/     icon generator (pixel-art PNGs, run automatically on build)
   a case in `biomeHeight()` in `src/world/terrain.ts`.
 - **A new tree or plant:** add a model in `buildTree()` / `buildPlant()` in
   `src/world/vegetation.ts` and list it in a biome's `trees` / `plants`.
+- **A new building piece:** add a row to `PIECES` in `src/data/pieces.ts` and a
+  model in `MODELS` in `src/world/building.ts`. Blueprints live in `BLUEPRINTS`.
 - **A new texture:** add a painter to `PAINTERS` in `src/world/textures.ts`.
 - **A new animal:** add a model + behaviour row to `SPECIES` in
   `src/entities/animals.ts` and list it in a biome's `animals`.

@@ -120,7 +120,7 @@ export class Props {
     }
   }
 
-  update(time: number, player: THREE.Vector3, camera: THREE.PerspectiveCamera) {
+  update(time: number, player: THREE.Vector3, camera: THREE.PerspectiveCamera, extra: { pos: THREE.Vector3; col: THREE.Vector3; r: number; d: number }[] = []) {
     if (this.dirty) {
       this.dirty = false;
       for (const [type, layer] of this.layers) {
@@ -135,7 +135,7 @@ export class Props {
     for (const layer of this.layers.values()) layer.cull(this.frustum);
 
     // lights: held torch first, then the nearest fires
-    const lights: { pos: THREE.Vector3; col: THREE.Vector3; r: number; d: number }[] = [];
+    const lights: { pos: THREE.Vector3; col: THREE.Vector3; r: number; d: number }[] = [...extra];
     if (this.heldLight) lights.push({ ...this.heldLight, d: -1 });
     for (const p of this.list) {
       const L = LIGHTS[p.type];

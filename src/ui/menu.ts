@@ -1,12 +1,12 @@
 // The in-game menu: Inventory (drag & drop, long-press info, split), Crafting,
 // Settings and Save. Touch-first; also works with a mouse.
-import { Inventory, HOTBAR, BACKPACK } from '../game/inventory';
+import { Inventory, HOTBAR, BACKPACK, Stack } from '../game/inventory';
 import { ITEMS, RARITY_COLOR, Recipe, Station } from '../data/items';
 import { iconUrl } from './icons';
 import { slotHTML } from './hotbar';
 import { buildSettings } from './settings-panel';
 
-export type MenuTab = 'inventory' | 'crafting' | 'settings' | 'save';
+export type MenuTab = 'inventory' | 'crafting' | 'settings' | 'save' | 'chest';
 export interface MenuHooks {
   stations(): Set<Station>;
   save(): Promise<void>;
@@ -22,6 +22,7 @@ export class Menu {
   private body!: HTMLDivElement;
   private tab: MenuTab = 'inventory';
   private infoSlot = -1;
+  private chest: (Stack | null)[] | null = null;
 
   constructor(private parent: HTMLElement, private inv: Inventory, private hooks: MenuHooks) {
     inv.onChange(() => { if (this.root && (this.tab === 'inventory' || this.tab === 'crafting')) this.renderTab(); });
@@ -38,7 +39,10 @@ export class Menu {
     box.className = 'menu-box';
     const tabs = document.createElement('div');
     tabs.className = 'tabs';
-    for (const [t, label] of [['inventory', 'Pack'], ['crafting', 'Craft'], ['settings', 'Settings'], ['save', 'Save']] as [MenuTab, string][]) {
+    if (tab !== 'chest') this.chest = null;
+    const tabList: [MenuTab, string][] = [['inventory', 'Pack'], ['crafting', 'Craft'], ['settings', 'Settings'], ['save', 'Save']];
+    if (this.chest) tabList.unshift(['chest', 'Chest']);
+    for (const [t, label] of tabList) {
       const b = document.createElement('button');
       b.textContent = label;
       b.classList.toggle('on', t === tab);
@@ -69,7 +73,8 @@ export class Menu {
   private renderTab() {
     const b = this.body;
     b.innerHTML = '';
-    if (this.tab === 'inventory') this.renderInventory(b);
+    if (this.tab === 'chest' && this.chest) this.renderChest(b, this.chest);
+    else if (this.tab === 'inventory') this.renderInventory(b);
     else if (this.tab === 'crafting') this.renderCrafting(b);
     else if (this.tab === 'settings') buildSettings(b);
     else this.renderSave(b);
@@ -153,6 +158,39 @@ export class Menu {
       this.inv.move(this.infoSlot, free >= 0 ? free : this.inv.selected);
     });
     btn('Discard', () => { this.inv.slots[this.infoSlot] = null; this.inv.changed(); });
+  }
+
+  /** Open a storage container (chest). Tap an item to move its stack across. */
+  openChest(items: (Stack | null)[]) { this.chest = items; this.open('chest'); }
+
+  private renderChest(b: HTMLElement, chest: (Stack | null)[]) {
+    const wrap = document.createElement('div'); wrap.className = 'inv-wrap';
+    const col = (label: string, n: number, get: (i: number) => Stack | null, tap: (i: number) => void) => {
+      const box = document.createElement('div');
+      const l = document.createElement('div'); l.className = 'inv-label'; l.textContent = label;
+      const g = document.createElement('div'); g.className = 'inv-grid';
+      for (let i = 0; i < n; i++) {
+        const el = document.createElement('div'); el.className = 'slot';
+        slotHTML(el, get(i));
+        el.addEventListener('pointerup', () => { tap(i); this.renderTab(); });
+        g.appendChild(el);
+      }
+      box.append(l, g); wrap.appendChild(box);
+    };
+    col('CHEST — TAP TO TAKE', chest.length, (i) => chest[i], (i) => {
+      const s = chest[i]; if (!s) return;
+      const left = this.inv.add(s.id, s.n);
+      if (left) s.n = left; else chest[i] = null;
+    });
+    col('YOUR PACK — TAP TO STORE', HOTBAR + BACKPACK, (i) => this.inv.slots[i], (i) => {
+      const s = this.inv.slots[i]; if (!s) return;
+      const max = ITEMS[s.id].stack ?? 99;
+      for (let k = 0; k < chest.length && s.n > 0; k++) { const c = chest[k]; if (c && c.id === s.id && c.n < max) { const m = Math.min(s.n, max - c.n); c.n += m; s.n -= m; } }
+      if (s.n > 0) { const free = chest.findIndex((c) => !c); if (free >= 0) { chest[free] = { ...s }; s.n = 0; } }
+      if (s.n <= 0) this.inv.slots[i] = null;
+      this.inv.changed();
+    });
+    b.appendChild(wrap);
   }
 
   // ---------------------------------------------------------------- crafting

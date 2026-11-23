@@ -10,6 +10,8 @@ import type { Player } from '../entities/player';
 import type { HeroModel } from '../entities/hero';
 import type { Props } from '../world/props';
 import { B } from '../world/blocks';
+import type { Building, Piece } from '../world/building';
+import { PIECES } from '../data/pieces';
 
 const REACH = 4.2;
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -24,6 +26,8 @@ export interface InteractUI {
   setAttack(label: string): void;              // label for the ATTACK button
   toast(text: string, color?: string): void;   // pickup / info messages
   openCrafting(): void;
+  openChest(p: Piece): void;
+  sleep(p: Piece): void;
 }
 
 /** 3D model of a held item (tools, torch, food...). */
@@ -85,7 +89,7 @@ export class Interaction {
   private action: (() => void) | null = null;
   readonly group = new THREE.Group();
 
-  constructor(private world: World, private player: Player, private hero: HeroModel, private inv: Inventory, private props: Props, private ui: InteractUI) {
+  constructor(private world: World, private player: Player, private hero: HeroModel, private inv: Inventory, private props: Props, private building: Building, private ui: InteractUI) {
     this.marker = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.3, 24), new THREE.MeshBasicMaterial({ color: 0xffe8b0, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
     this.marker.visible = false;
     this.marker.renderOrder = 10;
@@ -155,6 +159,9 @@ export class Interaction {
     let best: Target = null, bestD = Infinity;
     const hit = this.world.raycast(origin, dir, maxDist);
     if (hit && hit.point.distanceTo(eye) <= REACH) { best = { type: 'terrain', point: hit.point, normal: hit.normal, material: hit.material }; bestD = hit.dist; }
+    // building pieces stop the ray (you can't dig through your floor)
+    const ph = this.building.raycast(origin, dir, maxDist);
+    if (ph && ph.dist < bestD) { best = null; bestD = ph.dist; }
     // tree trunks: ray vs vertical cylinders
     const trees: TreeHit[] = [];
     this.world.treesNear(this.player.pos.x, this.player.pos.z, REACH + 1, trees);
@@ -290,7 +297,15 @@ export class Interaction {
       near.sort((a, b) => ((a.x - p.x) ** 2 + (a.z - p.z) ** 2) - ((b.x - p.x) ** 2 + (b.z - p.z) ** 2));
       const plant = near.find((q) => PLANT_DROPS[q.kind]);
       const station = this.props.nearest(p, 2.4);
-      if (plant) {
+      const piece = this.building.usable(p, this.player.yaw);
+      if (piece) {
+        const use = PIECES[piece.id].use;
+        if (use === 'door') { label = piece.open ? 'Close door' : 'Open door'; this.action = () => this.building.toggleDoor(piece); }
+        else if (use === 'bed') { label = 'Sleep'; this.action = () => this.ui.sleep(piece); }
+        else if (use === 'chest') { label = 'Open chest'; this.action = () => this.ui.openChest(piece); }
+        else if (use === 'sit') { label = this.player.sitting ? 'Stand up' : 'Sit'; this.action = () => { this.player.sitting = !this.player.sitting; if (this.player.sitting) { this.player.pos.set(piece.x, piece.y + 0.05, piece.z); this.player.yaw = piece.rot + Math.PI; } }; }
+        else if (use === 'claim') { label = 'Boundary stone'; this.action = () => this.ui.toast(this.building.isSafe(this.player.pos) ? 'Your land is claimed and lit. Monsters will not spawn here.' : 'Your land is claimed. Light it (torch, lantern, fireplace) to keep monsters away.', '#c8b0ff'); }
+      } else if (plant) {
         const d = PLANT_DROPS[plant.kind];
         label = d.verb;
         this.action = () => {

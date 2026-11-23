@@ -192,3 +192,24 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .slot-card h3 { margin: 0; color: var(--gold); letter-spacing: 3px; }
 .slot-card .meta { color: #a8987c; font-size: 14px; line-height: 1.5; }
 .slot-card .btn { min-width: 0; min-height: 52px; font-size: 15px; }
+
+/* ---------- build mode ---------- */
+.build-ui { position: absolute; inset: 0; pointer-events: none; }
+.build-bar { position: absolute; left: calc(12px + var(--sal)); right: calc(150px + var(--sar)); bottom: calc(8px + var(--sab));
+  pointer-events: auto; background: rgba(12,9,8,.72); border: 2px solid var(--panel-border); }
+.build-tabs { display: flex; }
+.build-tabs button { flex: 1; min-height: 44px; background: transparent; border: 0; color: #a8987c; letter-spacing: 3px; text-transform: uppercase; font-size: 13px; }
+.build-tabs button.on { color: var(--gold); box-shadow: inset 0 -3px 0 var(--blood); }
+.build-strip { display: flex; gap: 8px; overflow-x: auto; padding: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x; }
+.bcard { flex: 0 0 112px; min-height: 112px; background: rgba(30,22,18,.9); border: 2px solid #3a2a1e; padding: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.bcard.sel { border-color: var(--gold); box-shadow: 0 0 8px rgba(216,169,58,.5); }
+.bcard img { width: 44px; height: 44px; pointer-events: none; }
+.bname { font-size: 12px; text-align: center; color: var(--ink); }
+.bcost { font-size: 10px; text-align: center; color: #a8987c; line-height: 1.3; }
+.bcost .miss { color: #e06050; }
+.build-side { position: absolute; right: calc(12px + var(--sar)); bottom: calc(8px + var(--sab)); width: 128px; display: flex; flex-direction: column-reverse; gap: 8px; pointer-events: auto; }
+.bbtn { min-height: 54px; background: rgba(14,10,10,.7); color: var(--ink); border: 2px solid rgba(232,220,192,.35); font-size: 14px; letter-spacing: 1px; touch-action: none; }
+.bbtn.big { min-height: 96px; font-size: 18px; border-color: rgba(120,200,120,.7); }
+.bbtn.down, .bbtn.on { background: rgba(179,18,27,.5); }
+.build-btn { top: calc(158px + var(--sat)) !important; font-size: 26px !important; }
+.fade { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 1.2s; pointer-events: none; display: flex; align-items: center; justify-content: center; color: #c8b890; letter-spacing: 6px; }

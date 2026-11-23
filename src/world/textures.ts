@@ -359,6 +359,31 @@ const PAINTERS: Record<string, Painter> = {
     return { c: mix(mul(mix(hex(0x7a7670), hex(0xa09a92), w.id), 0.9 + fbm(u, v, 16, 3, 71) * 0.2), hex(0x2a2826), edge), h: 0.8 - edge * 0.7 };
   },
   white: () => ({ c: [235, 235, 235], h: 0.5 }),
+  shingles: (u, v) => {
+    const row = Math.floor(v * 8), off = row % 2 ? 0.5 : 0;
+    const x = (u * 6 + off) % 1, y = (v * 8) % 1;
+    const tile = ihash(Math.floor(u * 6 + off), row, 90);
+    const edge = sstep(0.12, 0.0, y) + sstep(0.06, 0, Math.min(x, 1 - x)) * 0.6;
+    const c = mul(mix(hex(0x5a3a2a), hex(0x7a4a32), tile), (0.75 + y * 0.35) * (0.9 + fbm(u, v, 16, 2, 91) * 0.2));
+    return { c: mix(c, hex(0x1e140e), Math.min(1, edge)), h: y * 0.8 - edge * 0.4 + 0.2 };
+  },
+  thatch: (u, v) => {
+    const str = fbm(u * 0.15, v, 40, 3, 92);
+    const band = Math.abs(((v * 5) % 1) - 0.5) * 2;
+    return { c: mul(mix(hex(0x8a7440), hex(0xc8a868), str), 0.75 + band * 0.3), h: str * 0.6 + band * 0.4 };
+  },
+  stone_brick: (u, v) => {
+    const row = Math.floor(v * 4), off = row % 2 ? 0.25 : 0;
+    const x = (u * 2 + off) % 1, y = (v * 4) % 1;
+    const id = ihash(Math.floor(u * 2 + off), row, 93);
+    const mortar = sstep(0.06, 0.0, Math.min(y, 1 - y)) + sstep(0.04, 0, Math.min(x, 1 - x));
+    const c = mul(mix(hex(0x6e6a64), hex(0x9a948a), id), 0.85 + fbm(u, v, 12, 3, 94) * 0.3);
+    return { c: mix(c, hex(0x3a3632), Math.min(1, mortar)), h: 0.8 - Math.min(1, mortar) * 0.7 };
+  },
+  fabric: (u, v) => {
+    const w = (Math.sin(u * Math.PI * 128) * Math.sin(v * Math.PI * 128)) * 0.5 + 0.5;
+    return { c: mul([210, 205, 195], 0.85 + w * 0.15 + fbm(u, v, 8, 2, 95) * 0.1), h: w * 0.4 };
+  },
   water_normal: (u, v) => ({ c: [128, 128, 255], h: fbm(u, v, 4, 4, 72) * 0.6 + fbm(u, v, 12, 2, 73) * 0.4 }),
   rock_moss_top: (u, v) => {
     const p = rock(hex(0x8a8680), hex(0x55514c), 74)(u, v);

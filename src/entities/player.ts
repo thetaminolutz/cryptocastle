@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { input } from '../engine/input';
 import type { World, TreeHit } from '../world/world';
+import type { AABB } from '../world/building';
 
 const SPHERES = [0.42, 0.95, 1.45]; // sphere centre heights above the feet
 const RADIUS = 0.4;
@@ -38,6 +39,9 @@ export class Player {
   speed = 0;           // horizontal speed (for animation)
   onDamage: ((amount: number, cause: string) => void) | null = null;
   onDeath: ((cause: string) => void) | null = null;
+  /** building collision boxes near the player (filled by the game each frame) */
+  boxes: AABB[] = [];
+  sitting = false;
 
   private staminaDelay = 0;
   private sinceDamage = 10;
@@ -74,6 +78,10 @@ export class Player {
 
   update(dt: number, world: World, camYaw: number, camPitch: number, firstPerson: boolean) {
     if (this.dead || !world.isLoaded(this.pos.x, this.pos.z)) return;
+    if (this.sitting) {
+      if (Math.hypot(input.move.x, input.move.y) > 0.3 || input.button('jump').pressed) this.sitting = false;
+      else { this.vel.set(0, 0, 0); this.speed = 0; this.state = 'ground'; this.stamina = Math.min(PLAYER_TUNING.staminaMax, this.stamina + 30 * dt); return; }
+    }
     const T = PLAYER_TUNING;
 
     // ---- input → wish direction (relative to camera)
@@ -233,6 +241,29 @@ export class Player {
           if (n.y < -0.6 && this.vel.y > 0) this.vel.y = 0;
           if (Math.abs(n.y) <= 0.6) this.wallContact = true;
         }
+      }
+    }
+    // building pieces: spheres vs boxes, with step-up onto low ledges (stairs, floors)
+    for (const b of this.boxes) {
+      for (let i = 0; i < SPHERES.length; i++) {
+        const cx = this.pos.x, cy = this.pos.y + SPHERES[i], cz = this.pos.z;
+        const qx = Math.max(b.min.x, Math.min(cx, b.max.x)), qy = Math.max(b.min.y, Math.min(cy, b.max.y)), qz = Math.max(b.min.z, Math.min(cz, b.max.z));
+        let dx = cx - qx, dy = cy - qy, dz = cz - qz;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 >= RADIUS * RADIUS) continue;
+        const stepUp = b.max.y - this.pos.y;
+        if (i === 0 && stepUp > -0.05 && stepUp < 0.5 && this.vel.y <= 1) {
+          this.pos.y = b.max.y; if (this.vel.y < 0) this.vel.y = 0; this.grounded = true; continue;
+        }
+        let d = Math.sqrt(d2);
+        if (d < 1e-5) { dx = 0; dy = 1; dz = 0; d = 1; } // centre inside: push up
+        const pen = RADIUS - Math.sqrt(d2);
+        const nx = dx / d, ny = dy / d, nz = dz / d;
+        this.pos.x += nx * pen; this.pos.y += ny * pen; this.pos.z += nz * pen;
+        const vn = this.vel.x * nx + this.vel.y * ny + this.vel.z * nz;
+        if (vn < 0) { this.vel.x -= nx * vn; this.vel.y -= ny * vn; this.vel.z -= nz * vn; }
+        if (ny > 0.6) this.grounded = true;
+        else if (Math.abs(ny) < 0.6) this.wallContact = true;
       }
     }
     // tree trunks: vertical cylinders

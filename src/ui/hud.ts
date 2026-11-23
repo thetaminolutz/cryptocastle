@@ -16,7 +16,7 @@ export class Hud {
   private bannerTimer = 0;
   private last = '';
 
-  constructor(parent: HTMLElement, onMenu: () => void, onView: () => void) {
+  constructor(parent: HTMLElement, onMenu: () => void, onView: () => void, onBuild: () => void) {
     this.root = document.createElement('div');
     this.root.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
     this.flash = document.createElement('div');
@@ -48,11 +48,12 @@ export class Hud {
     };
     const menu = btn('menu-btn', '☰', onMenu);
     const view = btn('menu-btn view-btn', '◐', onView);
+    const build = btn('menu-btn build-btn', '⚒', onBuild);
     this.banner = document.createElement('div');
     this.banner.className = 'region-banner';
     const vignette = document.createElement('div');
     vignette.className = 'vignette';
-    this.root.append(vignette, this.flash, this.banner, this.top, bars, menu, view);
+    this.root.append(vignette, this.flash, this.banner, this.top, bars, menu, view, build);
     parent.appendChild(this.root);
   }
 

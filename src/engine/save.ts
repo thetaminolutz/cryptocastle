@@ -3,6 +3,7 @@
 import type { Stack } from '../game/inventory';
 import type { WorldDelta } from '../world/world';
 import type { PlacedProp } from '../world/props';
+import type { BuildSave } from '../world/building';
 
 export const SAVE_VERSION = 1;
 export const SLOT_COUNT = 3;
@@ -20,6 +21,7 @@ export interface SaveData {
   inventory: { slots: (Stack | null)[]; selected: number };
   world: WorldDelta;
   props: PlacedProp[];
+  building?: BuildSave;
 }
 
 const DB = 'duskmere';
@@ -48,6 +50,7 @@ async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBReq
 export function migrate(d: SaveData): SaveData {
   if (!d.version) d.version = 1;
   d.props ??= [];
+  d.building ??= { pieces: [], respawn: null };
   d.world ??= { edits: [], trees: [], plants: [] };
   return d;
 }

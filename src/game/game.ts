@@ -28,6 +28,9 @@ import { Props } from '../world/props';
 import { Hotbar } from '../ui/hotbar';
 import { Menu } from '../ui/menu';
 import { saves, SaveData, SAVE_VERSION } from '../engine/save';
+import { Building, Piece } from '../world/building';
+import { BuildMode } from './build-mode';
+import type { AABB } from '../world/building';
 
 const SPAWN = { x: 0.5, z: 0.5 };
 
@@ -58,6 +61,9 @@ export class Game {
   private gold = 0;
   readonly inventory = new Inventory();
   readonly props: Props;
+  readonly building: Building;
+  readonly build: BuildMode;
+  private boxes: AABB[] = [];
   readonly interaction: Interaction;
   private hotbar: Hotbar;
   private menu: Menu;
@@ -83,7 +89,9 @@ export class Game {
     this.world = new World(seed, settings.values.viewDistance, terrainMaterial(), liquidMaterial(), this.shadows);
     this.wildlife = new Wildlife(this.world, this.gen, this.shadows);
     this.props = new Props(this.shadows);
-    this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi, this.props.group);
+    this.building = new Building(this.shadows);
+    this.wildlife.isSafe = (p) => this.building.isSafe(p);
+    this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi, this.props.group, this.building.group);
     this.shadows.add(this.model.root);
     this.scene.fog = this.fog;
     this.applySettings();
@@ -95,7 +103,7 @@ export class Game {
       { name: 'dodge', label: 'Dodge', size: 68, right: 34, bottom: 140 },
       { name: 'interact', label: 'Use', size: 84, right: 150, bottom: 200 }
     ]);
-    this.hud = new Hud(ui, () => this.openMenu(), () => { this.rig.firstPerson = !this.rig.firstPerson; });
+    this.hud = new Hud(ui, () => this.openMenu(), () => { this.rig.firstPerson = !this.rig.firstPerson; }, () => this.build.toggle());
     this.hotbar = new Hotbar(ui, this.inventory);
     const cross = document.createElement('div'); cross.className = 'crosshair'; ui.appendChild(cross);
     this.stats = new FrameStats(ui);
@@ -106,11 +114,21 @@ export class Game {
       quit: () => { location.href = location.pathname; },
       onClose: () => this.setPaused(false)
     });
-    this.interaction = new Interaction(this.world, this.player, this.model, this.inventory, this.props, {
-      setAction: (l) => { this.touch.setVisible('interact', !!l); if (l) this.touch.setLabel('interact', l); },
+    this.interaction = new Interaction(this.world, this.player, this.model, this.inventory, this.props, this.building, {
+      setAction: (l) => { this.touch.setVisible('interact', !!l && !this.build.active); if (l) this.touch.setLabel('interact', l); },
       setAttack: (l) => this.touch.setLabel('attack', l),
       toast: (t, c) => this.hotbar.notify(t, c),
-      openCrafting: () => { this.setPaused(true); this.menu.open('crafting'); }
+      openCrafting: () => { this.setPaused(true); this.menu.open('crafting'); },
+      openChest: (p) => { if (p.items) { this.setPaused(true); this.menu.openChest(p.items); } },
+      sleep: (p) => this.sleep(p)
+    });
+    this.build = new BuildMode(ui, this.building, this.world, this.player, this.inventory, {
+      toast: (t, c) => this.hotbar.notify(t, c),
+      onToggle: (on) => {
+        for (const b of ['attack', 'interact', 'dodge', 'jump'] as const) this.touch.setVisible(b, !on && b !== 'interact');
+        this.hotbar.root.style.display = on ? 'none' : 'flex';
+        this.rig.distance = on ? 6 : 4.4;
+      }
     });
     this.scene.add(this.interaction.group);
     this.touch.setVisible('interact', false);
@@ -125,6 +143,7 @@ export class Game {
       this.playTime = d.playTime; this.created = d.created;
       this.spawnAt = { x: d.player.pos[0], y: d.player.pos[1], z: d.player.pos[2], yaw: d.player.yaw };
       this.player.life = d.player.life; this.player.stamina = d.player.stamina;
+      this.building.load(d.building);
     } else {
       this.inventory.add('staff', 1);
     }
@@ -168,7 +187,8 @@ export class Game {
       player: { pos: [p.pos.x, p.pos.y, p.pos.z], yaw: p.yaw, life: p.life, stamina: p.stamina },
       inventory: this.inventory.serialize() as SaveData['inventory'],
       world: this.world.serializeDelta(),
-      props: this.props.list
+      props: this.props.list,
+      building: this.building.serialize()
     };
   }
 
@@ -183,8 +203,29 @@ export class Game {
   }
 
   private respawn() {
+    const bed = this.building.respawn;
+    if (bed) { this.player.spawn(bed.x, bed.y + 0.6, bed.z); return; }
     const y = this.world.groundY(SPAWN.x, SPAWN.z);
     this.player.spawn(SPAWN.x, y + 0.05, SPAWN.z);
+  }
+
+  /** Sleep in a bed: sets the respawn point; at night, skip to morning. */
+  private sleep(p: Piece) {
+    this.building.respawn = new THREE.Vector3(p.x, p.y, p.z);
+    if (!this.sky.isNight) { this.hotbar.notify('You are not tired. This bed now marks your home.', '#c8d8ff'); void this.save(); return; }
+    const fade = document.createElement('div'); fade.className = 'fade'; fade.textContent = 'YOU SLEEP…';
+    document.getElementById('ui')!.appendChild(fade);
+    requestAnimationFrame(() => { fade.style.opacity = '1'; });
+    setTimeout(() => {
+      if (this.sky.time > 0.5) this.sky.day++;
+      this.sky.time = 0.26;
+      this.player.life = 100; this.player.stamina = 100;
+      this.player.spawn(p.x + Math.cos(p.rot) * 1.0, p.y + 0.1, p.z - Math.sin(p.rot) * 1.0);
+      void this.save();
+      fade.style.opacity = '0';
+      setTimeout(() => fade.remove(), 1300);
+      this.hotbar.notify('Morning comes. You feel rested.', '#f0e0a0');
+    }, 1500);
   }
 
   private trySpawn() {
@@ -222,17 +263,21 @@ export class Game {
     input.poll(dt);
     if (!this.spawned) this.trySpawn();
     if (this.spawned) {
+      this.building.boxesNear(this.player.pos, 3, this.boxes);
+      this.player.boxes = this.boxes;
       this.player.update(dt, this.world, this.rig.yaw, this.rig.pitch, this.rig.firstPerson);
       this.props.collide(this.player.pos);
       this.playTime += dt;
       this.autosave -= dt;
       if (this.autosave <= 0) { this.autosave = 120; void this.save(); }
     }
+    if (input.key('KeyB')) this.build.toggle();
     // the world map: the hotbar via number keys
     for (let i = 0; i < 6; i++) if (input.key(`Digit${i + 1}`)) { this.inventory.selected = i; this.inventory.changed(); }
     const cam = this.renderer.camera;
     this.rig.update(dt, cam, this.player, this.world);
-    if (this.spawned) this.interaction.update(dt, cam, this.elapsed);
+    if (this.spawned && !this.build.active) this.interaction.update(dt, cam, this.elapsed);
+    if (this.spawned) this.build.update(dt, cam);
     this.model.update(dt, this.player, !this.rig.firstPerson && this.spawned);
 
     // biome & region around the player
@@ -245,7 +290,11 @@ export class Game {
       if (murky) { U.uWaterShallow.value.setRGB(0.05, 0.07, 0.025); U.uWaterDeep.value.setRGB(0.012, 0.016, 0.006); }
       else { U.uWaterShallow.value.setRGB(0.05, 0.22, 0.2); U.uWaterDeep.value.setRGB(0.004, 0.03, 0.05); }
       const r = this.regions.at(p.x, p.z);
-      if (r.id !== this.regionId) { this.regionId = r.id; this.hud.showRegion(r.name, r.subtitle); }
+      if (r.id !== this.regionId) {
+        this.regionId = r.id;
+        const pips = Math.min(5, Math.ceil(r.danger / 2));
+        this.hud.showRegion(r.name, `${BIOMES[this.biome].name} · Danger ${'◆'.repeat(pips)}${'◇'.repeat(5 - pips)}`);
+      }
     }
 
     this.sky.update(dt, cam.position);
@@ -255,7 +304,8 @@ export class Game {
     this.updateLightsAndFog(cam);
     this.world.update(dt, this.player.pos, this.rig.forward, cam);
     if (this.spawned) this.wildlife.update(dt, this.player.pos, this.sky.isNight);
-    this.props.update(this.elapsed, this.player.pos, cam);
+    this.building.update(this.player.pos, cam);
+    this.props.update(this.elapsed, this.player.pos, cam, this.building.lights(this.player.pos, this.elapsed));
     this.hotbar.tick();
     this.renderer.gl.info.reset();
     this.shadows.render(this.renderer.gl, this.scene, this.player.pos);

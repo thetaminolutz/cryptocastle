@@ -34,7 +34,8 @@ function startGame(slot = 0, data: SaveData | null = null) {
   setTimeout(() => {
     game = new Game(canvas, uiRoot, { slot, seed, data });
     game.start();
-    (window as unknown as { __game: Game }).__game = game;
+    (window as unknown as { __game: Game; __input: typeof input }).__game = game;
+    (window as unknown as { __input: typeof input }).__input = input;
     setTimeout(() => loading.remove(), 1200);
   }, 50);
 }

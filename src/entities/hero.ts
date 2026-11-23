@@ -417,6 +417,10 @@ export class HeroModel {
         break;
     }
     if (p.state !== 'roll') this.roll = 0;
+    if (p.sitting) {
+      thighL = thighR = 1.45; shinL = shinR = -1.45; footL = footR = 0; hipsY = 0.52;
+      armLx = armRx = 0.45; foreL = foreR = 0.6; spineX = 0.05; chestX = 0;
+    }
 
     // tool swing (right arm + torso twist)
     if (this.swing >= 0) {

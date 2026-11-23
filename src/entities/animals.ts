@@ -154,6 +154,8 @@ export class Wildlife {
   private animals: Animal[] = [];
   private spawnTimer = 0;
   private rnd = Math.random;
+  /** set by the game: true inside a lit, claimed plot (no predators spawn there) */
+  isSafe: (p: THREE.Vector3) => boolean = () => false;
 
   constructor(private world: World, private gen: TerrainGen, shadows: ShadowSystem) {
     SPECIES.forEach((def) => {
@@ -191,6 +193,7 @@ export class Wildlife {
     let r = this.rnd() * total, sp = table[0][0];
     for (const [s, w] of table) { if (r < w) { sp = s; break; } r -= w; }
     const def = SPECIES[sp];
+    if (def.behaviour === 'predator' && this.isSafe(new THREE.Vector3(x, player.y, z))) return;
     if (this.animals.filter((a) => a.sp === sp).length >= MAX_PER_SPECIES - def.herd[1]) return;
     const ground = this.world.groundY(x, z);
     const water = this.world.waterSurface(x, ground + 1, z);
