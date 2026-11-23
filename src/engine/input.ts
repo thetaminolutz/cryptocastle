@@ -28,6 +28,7 @@ class InputState {
     const map: Record<string, ButtonName> = { Space: 'jump', KeyC: 'down', ControlLeft: 'down', KeyF: 'attack', KeyR: 'block', KeyQ: 'dodge', KeyE: 'interact', Tab: 'skill', Escape: 'menu' };
     window.addEventListener('keydown', (e) => {
       if (e.target instanceof HTMLInputElement) return;
+      if (!this.keys.has(e.code)) this.keyEdges.add(e.code);
       this.keys.add(e.code);
       const b = map[e.code];
       if (b) { this.press(b); e.preventDefault(); }
@@ -39,6 +40,10 @@ class InputState {
     });
     window.addEventListener('blur', () => { this.keys.clear(); for (const n of this.buttons.keys()) this.release(n); });
   }
+
+  /** Was this key pressed this frame (edge)? */
+  key(code: string): boolean { return this.keyEdges.has(code); }
+  private keyEdges = new Set<string>();
 
   /** Merge sources; call once per frame before game logic. */
   poll(dt: number) {
@@ -75,6 +80,7 @@ class InputState {
   /** Clear per-frame edges; call at the end of each frame. */
   endFrame() {
     this.lookDX = 0; this.lookDY = 0;
+    this.keyEdges.clear();
     for (const b of this.buttons.values()) { b.pressed = false; b.released = false; }
   }
 }

@@ -45,7 +45,10 @@ export const U = {
   uMatSide: { value: matSide },
   uMatGlow: { value: matGlow },
   uBiomeTint: { value: biomeTints },
-  uVegRadius: { value: 30 }
+  uVegRadius: { value: 30 },
+  uPointPos: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -999, 0, 1)) },
+  uPointCol: { value: Array.from({ length: 8 }, () => new THREE.Vector3()) },
+  uPointCount: { value: 0 }
 };
 
 export function bindTextures(t: TextureSet) {
@@ -115,6 +118,23 @@ vec3 applyFog(vec3 col, vec3 wp) {
   float sun = pow(max(dot(dir, uSunDir), 0.0), 6.0);
   vec3 fc = uFogColor + uSunGlow * sun * 0.35;
   return mix(col, fc, f);
+}
+
+uniform vec4 uPointPos[8];
+uniform vec3 uPointCol[8];
+uniform int uPointCount;
+/** Torches, campfires, furnaces: up to 8 dynamic point lights. */
+vec3 pointLights(vec3 wp, vec3 n) {
+  vec3 sum = vec3(0.0);
+  for (int i = 0; i < 8; i++) {
+    if (i >= uPointCount) break;
+    vec3 d = uPointPos[i].xyz - wp;
+    float dist = length(d);
+    float att = clamp(1.0 - dist / uPointPos[i].w, 0.0, 1.0);
+    att *= att;
+    sum += uPointCol[i] * att * (max(dot(n, d / max(dist, 1e-3)), 0.0) * 0.8 + 0.2);
+  }
+  return sum;
 }
 
 vec3 shade(vec3 albedo, vec3 n, float ao, float sky, float blk, float shadow, float wrap) {
@@ -223,6 +243,7 @@ void main() {
   vec3 V = normalize(cameraPosition - wp);
   float spec = pow(max(dot(reflect(-uLightDir, N), V), 0.0), 40.0) * (0.04 + uWetness * 0.5 * topness);
   col += uLightColor * spec * shadow * vLight.y;
+  col += albedo * pointLights(wp, N) * (0.4 + 0.6 * vLight.x);
   col += albedo * glow * (1.2 + uNight);
   gl_FragColor = vec4(applyFog(col, wp), 1.0);
   #include <tonemapping_fragment>
@@ -427,6 +448,7 @@ void main() {
     vec3 V = normalize(cameraPosition - vWorld);
     col += albedo * uLightColor * pow(max(dot(-V, uLightDir), 0.0), 4.0) * 0.6 * shadow;
   }
+  col += albedo * pointLights(vWorld, n) * vAo;
   col += albedo * vLayerTint.z * (1.0 + uNight * 2.0);
   gl_FragColor = vec4(applyFog(col, vWorld), outA);
   #include <tonemapping_fragment>

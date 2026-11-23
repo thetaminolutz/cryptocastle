@@ -16,15 +16,22 @@ import { CHUNK_SIZE, SEA_LEVEL } from '../world/constants';
 import { TerrainGen } from '../world/terrain';
 import { BIOMES, Biome } from '../world/biomes';
 import { Player } from '../entities/player';
-import { PlayerModel } from '../entities/player-model';
+import { HeroModel } from '../entities/hero';
 import { CameraRig } from '../entities/camera-rig';
 import { Wildlife } from '../entities/animals';
 import { Hud } from '../ui/hud';
 import { TouchControls } from '../ui/touch';
-import { openSettings } from '../ui/settings-panel';
 import { showToast } from '../ui/toast';
+import { Inventory } from './inventory';
+import { Interaction } from './interaction';
+import { Props } from '../world/props';
+import { Hotbar } from '../ui/hotbar';
+import { Menu } from '../ui/menu';
+import { saves, SaveData, SAVE_VERSION } from '../engine/save';
 
 const SPAWN = { x: 0.5, z: 0.5 };
+
+export interface GameStart { slot: number; seed: number; data: SaveData | null; }
 
 export class Game {
   private renderer: Renderer;
@@ -38,7 +45,7 @@ export class Game {
   readonly shadows = new ShadowSystem();
   readonly player = new Player();
   readonly rig = new CameraRig();
-  private model = new PlayerModel();
+  readonly model = new HeroModel();
   private stats: FrameStats;
   private hud: Hud;
   readonly touch: TouchControls;
@@ -49,6 +56,15 @@ export class Game {
   private spawned = false;
   private elapsed = 0;
   private gold = 0;
+  readonly inventory = new Inventory();
+  readonly props: Props;
+  readonly interaction: Interaction;
+  private hotbar: Hotbar;
+  private menu: Menu;
+  private playTime = 0;
+  private autosave = 120;
+  private created = Date.now();
+  private spawnAt: { x: number; y: number; z: number; yaw: number } | null = null;
   private biomeTimer = 0;
   biome: Biome = Biome.MoonlitForest;
   private regionId = '';
@@ -57,7 +73,8 @@ export class Game {
   private hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
   private fog = new THREE.Fog(0x000000, 40, 96);
 
-  constructor(canvas: HTMLCanvasElement, private ui: HTMLElement, seed: number) {
+  constructor(canvas: HTMLCanvasElement, ui: HTMLElement, private start0: GameStart) {
+    const seed = start0.seed;
     this.renderer = new Renderer(canvas);
     bindTextures(createTextures(this.renderer.anisotropy));
     this.sky = new Sky(COMMON);
@@ -65,18 +82,52 @@ export class Game {
     this.regions = new Regions(this.gen, seed);
     this.world = new World(seed, settings.values.viewDistance, terrainMaterial(), liquidMaterial(), this.shadows);
     this.wildlife = new Wildlife(this.world, this.gen, this.shadows);
-    this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi);
+    this.props = new Props(this.shadows);
+    this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi, this.props.group);
     this.shadows.add(this.model.root);
     this.scene.fog = this.fog;
     this.applySettings();
     settings.onChange((_s, k) => { if (['viewDistance', 'shadows', 'vegetation', 'particles'].includes(k)) this.applySettings(); });
 
     this.touch = new TouchControls(ui, [
-      { name: 'jump', label: 'Jump', size: 96, right: 36, bottom: 36 },
-      { name: 'dodge', label: 'Dodge', size: 76, right: 150, bottom: 24 }
+      { name: 'jump', label: 'Jump', size: 92, right: 30, bottom: 30 },
+      { name: 'attack', label: 'Strike', size: 92, right: 140, bottom: 92 },
+      { name: 'dodge', label: 'Dodge', size: 68, right: 34, bottom: 140 },
+      { name: 'interact', label: 'Use', size: 84, right: 150, bottom: 200 }
     ]);
     this.hud = new Hud(ui, () => this.openMenu(), () => { this.rig.firstPerson = !this.rig.firstPerson; });
+    this.hotbar = new Hotbar(ui, this.inventory);
+    const cross = document.createElement('div'); cross.className = 'crosshair'; ui.appendChild(cross);
     this.stats = new FrameStats(ui);
+    this.menu = new Menu(ui, this.inventory, {
+      stations: () => this.props.stationsNear(this.player.pos),
+      save: () => this.save(),
+      exportSave: async () => { await this.save(); saves.exportFile(this.buildSave()); },
+      quit: () => { location.href = location.pathname; },
+      onClose: () => this.setPaused(false)
+    });
+    this.interaction = new Interaction(this.world, this.player, this.model, this.inventory, this.props, {
+      setAction: (l) => { this.touch.setVisible('interact', !!l); if (l) this.touch.setLabel('interact', l); },
+      setAttack: (l) => this.touch.setLabel('attack', l),
+      toast: (t, c) => this.hotbar.notify(t, c),
+      openCrafting: () => { this.setPaused(true); this.menu.open('crafting'); }
+    });
+    this.scene.add(this.interaction.group);
+    this.touch.setVisible('interact', false);
+
+    // restore or start fresh
+    const d = start0.data;
+    if (d) {
+      this.world.loadDelta(d.world);
+      this.props.load(d.props);
+      this.inventory.load(d.inventory);
+      this.sky.time = d.time; this.sky.day = d.day;
+      this.playTime = d.playTime; this.created = d.created;
+      this.spawnAt = { x: d.player.pos[0], y: d.player.pos[1], z: d.player.pos[2], yaw: d.player.yaw };
+      this.player.life = d.player.life; this.player.stamina = d.player.stamina;
+    } else {
+      this.inventory.add('staff', 1);
+    }
 
     this.player.onDamage = () => this.hud.hurt();
     this.player.onDeath = (cause) => {
@@ -85,8 +136,8 @@ export class Game {
     };
     this.weather.onThunder = () => audio.thunder();
 
-    document.addEventListener('visibilitychange', () => this.setPaused(document.hidden));
-    window.addEventListener('pagehide', () => this.setPaused(true));
+    document.addEventListener('visibilitychange', () => { this.setPaused(document.hidden); if (document.hidden) void this.save(); });
+    window.addEventListener('pagehide', () => { this.setPaused(true); void this.save(); });
     window.addEventListener('pageshow', () => this.setPaused(false));
   }
 
@@ -106,7 +157,24 @@ export class Game {
 
   private openMenu() {
     this.setPaused(true);
-    openSettings(this.ui, () => this.setPaused(false));
+    this.menu.open();
+  }
+
+  buildSave(): SaveData {
+    const p = this.player;
+    return {
+      version: SAVE_VERSION, slot: this.start0.slot, seed: this.start0.seed, mode: 'wanderer',
+      created: this.created, updated: Date.now(), playTime: this.playTime, day: this.sky.day, time: this.sky.time,
+      player: { pos: [p.pos.x, p.pos.y, p.pos.z], yaw: p.yaw, life: p.life, stamina: p.stamina },
+      inventory: this.inventory.serialize() as SaveData['inventory'],
+      world: this.world.serializeDelta(),
+      props: this.props.list
+    };
+  }
+
+  async save() {
+    if (!this.spawned) return;
+    try { await saves.write(this.buildSave()); } catch (e) { console.warn('save failed', e); }
   }
 
   setPaused(p: boolean) {
@@ -117,6 +185,16 @@ export class Game {
   private respawn() {
     const y = this.world.groundY(SPAWN.x, SPAWN.z);
     this.player.spawn(SPAWN.x, y + 0.05, SPAWN.z);
+  }
+
+  private trySpawn() {
+    const s = this.spawnAt;
+    if (!s) { if (this.world.isLoaded(SPAWN.x, SPAWN.z)) { this.respawn(); this.spawned = true; } return; }
+    if (!this.world.isLoaded(s.x, s.z)) return;
+    const life = this.player.life, st = this.player.stamina;
+    this.player.spawn(s.x, Math.max(s.y, this.world.groundNear(s.x, s.z, s.y)) + 0.05, s.z);
+    this.player.life = life; this.player.stamina = st; this.player.yaw = s.yaw; this.rig.yaw = s.yaw;
+    this.spawned = true;
   }
 
   start() {
@@ -142,10 +220,19 @@ export class Game {
   private frame(dt: number) {
     this.elapsed += dt;
     input.poll(dt);
-    if (!this.spawned && this.world.isLoaded(SPAWN.x, SPAWN.z)) { this.respawn(); this.spawned = true; }
-    if (this.spawned) this.player.update(dt, this.world, this.rig.yaw, this.rig.pitch, this.rig.firstPerson);
+    if (!this.spawned) this.trySpawn();
+    if (this.spawned) {
+      this.player.update(dt, this.world, this.rig.yaw, this.rig.pitch, this.rig.firstPerson);
+      this.props.collide(this.player.pos);
+      this.playTime += dt;
+      this.autosave -= dt;
+      if (this.autosave <= 0) { this.autosave = 120; void this.save(); }
+    }
+    // the world map: the hotbar via number keys
+    for (let i = 0; i < 6; i++) if (input.key(`Digit${i + 1}`)) { this.inventory.selected = i; this.inventory.changed(); }
     const cam = this.renderer.camera;
     this.rig.update(dt, cam, this.player, this.world);
+    if (this.spawned) this.interaction.update(dt, cam, this.elapsed);
     this.model.update(dt, this.player, !this.rig.firstPerson && this.spawned);
 
     // biome & region around the player
@@ -168,6 +255,8 @@ export class Game {
     this.updateLightsAndFog(cam);
     this.world.update(dt, this.player.pos, this.rig.forward, cam);
     if (this.spawned) this.wildlife.update(dt, this.player.pos, this.sky.isNight);
+    this.props.update(this.elapsed, this.player.pos, cam);
+    this.hotbar.tick();
     this.renderer.gl.info.reset();
     this.shadows.render(this.renderer.gl, this.scene, this.player.pos);
     this.renderer.render(this.scene);

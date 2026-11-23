@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { CHUNK_HEIGHT, CHUNK_SIZE, chunkKey, vIndex } from './constants';
 import type { WorkerRequest, WorkerResult } from './chunk-worker';
 import type { TerrainMesh, LiquidMesh } from './smooth-mesher';
-import { decodeDensity, TREE_STRIDE, WATER_SURFACE_OFFSET } from './terrain';
+import { decodeDensity, TREE_STRIDE, PLANT_STRIDE, WATER_SURFACE_OFFSET, PAD, PAD_VOLUME, pIdx, SOLID_MIN } from './terrain';
 import { Vegetation } from './vegetation';
 import { Tree } from './biomes';
 import { B } from './blocks';
@@ -31,7 +31,10 @@ export interface Chunk {
   liquid: THREE.Mesh | null;
 }
 
-export interface TreeHit { x: number; z: number; r: number; y0: number; y1: number; }
+export interface TreeHit { x: number; z: number; r: number; y0: number; y1: number; key: string; index: number; kind: number; }
+
+/** Saved world changes: only edited grid points (density/material) and removed vegetation. */
+export interface WorldDelta { edits: [string, number[]][]; trees: [string, number[]][]; plants: [string, number[]][]; }
 
 const LRU_MAX = 48;
 
@@ -111,13 +114,14 @@ export class World {
         this.chunks.set(key, cached);
         for (const m of [cached.terrain, cached.liquid]) if (m) this.group.add(m);
         if (cached.terrain) this.shadows.add(cached.terrain);
-        this.vegetation.setChunk(key, cached.trees, cached.plants);
+        this.syncVegetation(key, cached);
         continue;
       }
       const job = this.jobSeq++;
       this.pending.set(key, job);
       this.busy[wi]++;
-      this.workers[wi].postMessage({ type: 'build', job, cx, cz } satisfies WorkerRequest);
+      const edits = this.editsFor(cx, cz);
+      this.workers[wi].postMessage({ type: 'build', job, cx, cz, edits } satisfies WorkerRequest, edits ? [edits.buffer] : []);
     }
   }
 
@@ -126,6 +130,7 @@ export class World {
     while (this.ready.length && n < max) {
       const r = this.ready.shift()!;
       const key = chunkKey(r.cx, r.cz);
+      if (r.remesh) { this.applyRemesh(key, r); continue; }
       if (this.pending.get(key) !== r.job) continue;
       this.pending.delete(key);
       this.stats.genMs = this.stats.genMs * 0.9 + r.ms * 0.1;
@@ -136,7 +141,8 @@ export class World {
       };
       this.chunks.set(key, chunk);
       if (chunk.terrain) this.shadows.add(chunk.terrain);
-      this.vegetation.setChunk(key, r.trees, r.plants);
+      this.syncVegetation(key, chunk);
+      if (this.dirtyAfterLoad.delete(key)) this.remesh(key);
       n++;
     }
     this.stats.loaded = this.chunks.size;
@@ -208,6 +214,7 @@ export class World {
   }
 
   isLoaded(x: number, z: number) { return this.chunkAt(Math.floor(x), Math.floor(z)) !== null; }
+  get pad() { return PAD; }
 
   /** Density at an integer grid point in metres (+ = inside ground). Unloaded = solid. */
   gridDensity(x: number, y: number, z: number): number {
@@ -275,6 +282,187 @@ export class World {
     return 0;
   }
 
+  // ------------------------------------------------------------------ editing
+  private deltas = new Map<string, Map<number, number>>();     // chunk → vIndex → density<<8 | material
+  private removedTrees = new Map<string, Set<number>>();
+  private removedPlants = new Map<string, Set<number>>();
+  private remeshJobs = new Map<string, number>();
+  private dirtyAfterLoad = new Set<string>();
+
+  private syncVegetation(key: string, c: Chunk) {
+    const rt = this.removedTrees.get(key), rp = this.removedPlants.get(key);
+    const filter = (a: Float32Array, stride: number, rm?: Set<number>) => {
+      if (!rm || !rm.size) return a;
+      const out: number[] = [];
+      for (let i = 0, k = 0; i < a.length; i += stride, k++) if (!rm.has(k)) for (let j = 0; j < stride; j++) out.push(a[i + j]);
+      return new Float32Array(out);
+    };
+    this.vegetation.setChunk(key, filter(c.trees, TREE_STRIDE, rt), filter(c.plants, PLANT_STRIDE, rp));
+  }
+
+  isTreeRemoved(key: string, i: number) { return !!this.removedTrees.get(key)?.has(i); }
+  isPlantRemoved(key: string, i: number) { return !!this.removedPlants.get(key)?.has(i); }
+
+  removeTree(key: string, index: number) {
+    let s = this.removedTrees.get(key); if (!s) { s = new Set(); this.removedTrees.set(key, s); }
+    s.add(index);
+    const c = this.chunks.get(key); if (c) this.syncVegetation(key, c);
+  }
+  removePlant(key: string, index: number) {
+    let s = this.removedPlants.get(key); if (!s) { s = new Set(); this.removedPlants.set(key, s); }
+    s.add(index);
+    const c = this.chunks.get(key); if (c) this.syncVegetation(key, c);
+  }
+
+  /** Plants near a point: [key, index, x, y, z, kind]. */
+  plantsNear(x: number, y: number, z: number, r: number): { key: string; index: number; x: number; y: number; z: number; kind: number }[] {
+    const out: { key: string; index: number; x: number; y: number; z: number; kind: number }[] = [];
+    for (let cz = Math.floor((z - r) / CHUNK_SIZE); cz <= Math.floor((z + r) / CHUNK_SIZE); cz++)
+      for (let cx = Math.floor((x - r) / CHUNK_SIZE); cx <= Math.floor((x + r) / CHUNK_SIZE); cx++) {
+        const key = chunkKey(cx, cz), c = this.chunks.get(key);
+        if (!c) continue;
+        const rm = this.removedPlants.get(key);
+        for (let i = 0, k = 0; i < c.plants.length; i += PLANT_STRIDE, k++) {
+          if (rm?.has(k)) continue;
+          const dx = c.plants[i] - x, dy = c.plants[i + 1] - y, dz = c.plants[i + 2] - z;
+          if (dx * dx + dy * dy + dz * dz < r * r) out.push({ key, index: k, x: c.plants[i], y: c.plants[i + 1], z: c.plants[i + 2], kind: c.plants[i + 3] });
+        }
+      }
+    return out;
+  }
+
+  /**
+   * Dig a soft sphere out of the ground. Only materials allowed by `canDig` are
+   * affected. Returns the number of grid points removed per material.
+   */
+  dig(cx: number, cy: number, cz: number, r: number, strength: number, canDig: (m: number) => number): Map<number, number> {
+    const removed = new Map<number, number>();
+    const dirty = new Set<string>();
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+      if (y < 1 || y >= CHUNK_HEIGHT - 1) continue;
+      for (let z = Math.floor(cz - r); z <= Math.ceil(cz + r); z++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+        const d = Math.hypot(x - cx, y - cy, z - cz);
+        if (d > r) continue;
+        const c = this.chunkAt(x, z);
+        if (!c) continue;
+        const lx = x - c.cx * CHUNK_SIZE, lz = z - c.cz * CHUNK_SIZE, i = vIndex(lx, y, lz);
+        const v = c.density[i];
+        if (v < SOLID_MIN - 30) continue;
+        const m = c.material[i];
+        const mul = canDig(m);
+        if (mul <= 0) continue;
+        const nv = Math.max(0, Math.round(v - strength * (1 - d / r) * 40 * mul));
+        if (nv === v) continue;
+        c.density[i] = nv;
+        if (v >= SOLID_MIN && nv < SOLID_MIN) { removed.set(m, (removed.get(m) ?? 0) + 1); c.material[i] = 0; }
+        this.recordDelta(c, i);
+        for (const ox of [-1, 0, 1]) for (const oz of [-1, 0, 1]) {
+          if ((ox === -1 && lx !== 0) || (ox === 1 && lx !== CHUNK_SIZE - 1) || (oz === -1 && lz !== 0) || (oz === 1 && lz !== CHUNK_SIZE - 1)) continue;
+          dirty.add(chunkKey(c.cx + ox, c.cz + oz));
+        }
+      }
+    }
+    for (const key of dirty) this.remesh(key);
+    return removed;
+  }
+
+  private recordDelta(c: Chunk, i: number) {
+    const key = chunkKey(c.cx, c.cz);
+    let m = this.deltas.get(key); if (!m) { m = new Map(); this.deltas.set(key, m); }
+    m.set(i, (c.density[i] << 8) | c.material[i]);
+  }
+
+  /** Re-light and re-mesh a loaded chunk from its (edited) data + neighbours. */
+  remesh(key: string) {
+    const c = this.chunks.get(key);
+    if (!c) { this.dirtyAfterLoad.add(key); return; }
+    const den = new Uint8Array(PAD_VOLUME), mat = new Uint8Array(PAD_VOLUME);
+    for (let lz = -1; lz <= CHUNK_SIZE; lz++) for (let lx = -1; lx <= CHUNK_SIZE; lx++) {
+      const wx = c.cx * CHUNK_SIZE + lx, wz = c.cz * CHUNK_SIZE + lz;
+      let src = this.chunkAt(wx, wz), sx = wx, sz = wz;
+      if (!src) { src = c; sx = c.cx * CHUNK_SIZE + Math.max(0, Math.min(CHUNK_SIZE - 1, lx)); sz = c.cz * CHUNK_SIZE + Math.max(0, Math.min(CHUNK_SIZE - 1, lz)); }
+      const ix = sx - src.cx * CHUNK_SIZE, iz = sz - src.cz * CHUNK_SIZE;
+      for (let y = 0; y < CHUNK_HEIGHT; y++) {
+        const p = pIdx(lx, y, lz), v = vIndex(ix, y, iz);
+        den[p] = src.density[v]; mat[p] = src.material[v];
+      }
+    }
+    const job = this.jobSeq++;
+    this.remeshJobs.set(key, job);
+    let wi = 0;
+    for (let i = 1; i < this.workers.length; i++) if (this.busy[i] < this.busy[wi]) wi = i;
+    this.busy[wi]++;
+    this.workers[wi].postMessage({ type: 'mesh', job, cx: c.cx, cz: c.cz, density: den, material: mat } satisfies WorkerRequest, [den.buffer, mat.buffer]);
+  }
+
+  private applyRemesh(key: string, r: WorkerResult) {
+    if (this.remeshJobs.get(key) !== r.job) return;
+    this.remeshJobs.delete(key);
+    const c = this.chunks.get(key);
+    if (!c) return;
+    for (const m of [c.terrain, c.liquid]) if (m) { this.group.remove(m); this.shadows.remove(m); m.geometry.dispose(); }
+    c.terrain = this.makeTerrain(r.terrain, c.cx, c.cz);
+    c.liquid = this.makeLiquid(r.liquid, c.cx, c.cz);
+    if (c.terrain) this.shadows.add(c.terrain);
+  }
+
+  /** Edits that fall inside the padded volume of chunk (cx,cz), as [paddedIndex, value] pairs. */
+  private editsFor(cx: number, cz: number): Int32Array | undefined {
+    const out: number[] = [];
+    for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) {
+      const d = this.deltas.get(chunkKey(cx + ox, cz + oz));
+      if (!d) continue;
+      for (const [i, val] of d) {
+        const lx = (i % CHUNK_SIZE) + ox * CHUNK_SIZE, lz = (Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE) + oz * CHUNK_SIZE, y = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
+        if (lx < -1 || lx > CHUNK_SIZE || lz < -1 || lz > CHUNK_SIZE) continue;
+        out.push(pIdx(lx, y, lz), val);
+      }
+    }
+    return out.length ? new Int32Array(out) : undefined;
+  }
+
+  serializeDelta(): WorldDelta {
+    const flat = (m: Map<number, number>) => { const a: number[] = []; for (const [i, v] of m) a.push(i, v); return a; };
+    return {
+      edits: [...this.deltas].map(([k, m]) => [k, flat(m)]),
+      trees: [...this.removedTrees].map(([k, s]) => [k, [...s]]),
+      plants: [...this.removedPlants].map(([k, s]) => [k, [...s]])
+    };
+  }
+
+  loadDelta(d: WorldDelta) {
+    for (const [k, a] of d.edits) { const m = new Map<number, number>(); for (let i = 0; i < a.length; i += 2) m.set(a[i], a[i + 1]); this.deltas.set(k, m); }
+    for (const [k, a] of d.trees) this.removedTrees.set(k, new Set(a));
+    for (const [k, a] of d.plants) this.removedPlants.set(k, new Set(a));
+  }
+
+  /** March a ray through the density field; returns the first surface hit. */
+  raycast(o: THREE.Vector3, dir: THREE.Vector3, max: number): { point: THREE.Vector3; normal: THREE.Vector3; dist: number; material: number } | null {
+    let prevT = 0;
+    let prev = this.density(o.x, o.y, o.z);
+    if (prev > 0) return null;
+    for (let t = 0.12; t <= max; t += 0.12) {
+      const d = this.density(o.x + dir.x * t, o.y + dir.y * t, o.z + dir.z * t);
+      if (d > 0) {
+        let a = prevT, b = t;
+        for (let k = 0; k < 6; k++) { const m = (a + b) / 2; if (this.density(o.x + dir.x * m, o.y + dir.y * m, o.z + dir.z * m) > 0) b = m; else a = m; }
+        const point = o.clone().addScaledVector(dir, b);
+        const normal = new THREE.Vector3();
+        this.sdf(point, normal);
+        // material: the most solid grid point of the surrounding cell
+        let best = -1e9, material = 0;
+        for (let k = 0; k < 8; k++) {
+          const gx = Math.floor(point.x) + (k & 1), gy = Math.floor(point.y) + ((k >> 1) & 1), gz = Math.floor(point.z) + ((k >> 2) & 1);
+          const gd = this.gridDensity(gx, gy, gz);
+          if (gd > best) { best = gd; material = this.material(gx, gy, gz); }
+        }
+        return { point, normal, dist: b, material };
+      }
+      prev = d; prevT = t;
+    }
+    return null;
+  }
+
   /** Ground height near an expected height (cheap: searches a few metres). */
   groundNear(x: number, z: number, yGuess: number): number {
     let prev = this.density(x, yGuess + 4, z);
@@ -292,14 +480,17 @@ export class World {
     const cx0 = Math.floor((x - range) / CHUNK_SIZE), cx1 = Math.floor((x + range) / CHUNK_SIZE);
     const cz0 = Math.floor((z - range) / CHUNK_SIZE), cz1 = Math.floor((z + range) / CHUNK_SIZE);
     for (let cz = cz0; cz <= cz1; cz++) for (let cx = cx0; cx <= cx1; cx++) {
-      const c = this.chunks.get(chunkKey(cx, cz));
+      const key = chunkKey(cx, cz);
+      const c = this.chunks.get(key);
       if (!c) continue;
       const t = c.trees;
-      for (let i = 0; i < t.length; i += TREE_STRIDE) {
+      const rm = this.removedTrees.get(key);
+      for (let i = 0, idx = 0; i < t.length; i += TREE_STRIDE, idx++) {
+        if (rm?.has(idx)) continue;
         const dx = t[i] - x, dz = t[i + 2] - z;
         if (dx * dx + dz * dz > range * range) continue;
         const k = TRUNK[t[i + 3]], s = t[i + 4];
-        out.push({ x: t[i], z: t[i + 2], r: k.r * s, y0: t[i + 1], y1: t[i + 1] + k.h * s });
+        out.push({ x: t[i], z: t[i + 2], r: k.r * s, y0: t[i + 1], y1: t[i + 1] + k.h * s, key, index: idx, kind: t[i + 3] });
       }
     }
     return out;

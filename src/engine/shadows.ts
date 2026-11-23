@@ -14,6 +14,7 @@ export class ShadowSystem {
   private center = new THREE.Vector3();
   private tmp = new THREE.Vector3();
   enabled = false;
+  private needsInit = true;
   get radiusM() { return this.radius; }
 
   constructor() {
@@ -40,6 +41,7 @@ export class ShadowSystem {
       this.target.dispose();
       this.target = this.makeTarget(size);
       this.size = size;
+      this.needsInit = true;
     }
     U.uShadowOn.value = this.enabled ? 1 : 0;
     U.uShadowSize.value = size;
@@ -53,6 +55,11 @@ export class ShadowSystem {
   remove(obj: THREE.Object3D) { this.casters.delete(obj); }
 
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, focus: THREE.Vector3) {
+    if (this.needsInit) {
+      // allocate the depth texture once so the shadow sampler is always valid
+      this.needsInit = false;
+      renderer.setRenderTarget(this.target); renderer.clear(); renderer.setRenderTarget(null);
+    }
     if (!this.enabled) return;
     const dir = U.uLightDir.value;
     if (dir.y < 0.05) { U.uShadowOn.value = 0; return; }

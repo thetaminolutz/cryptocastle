@@ -15,6 +15,9 @@ export class TouchControls {
   private joyOrigin = { x: 0, y: 0 };
   private lookIds = new Map<number, { x: number; y: number }>();
   private buttons: HTMLDivElement[] = [];
+  private byName = new Map<ButtonName, HTMLDivElement>();
+  private labels = new Map<ButtonName, string>();
+  private hidden = new Set<ButtonName>();
 
   constructor(parent: HTMLElement, private specs: BtnSpec[]) {
     this.layer = document.createElement('div');
@@ -39,7 +42,9 @@ export class TouchControls {
     for (const s of this.specs) {
       const el = document.createElement('div');
       el.className = 'touch-btn';
-      el.textContent = s.label;
+      el.textContent = this.labels.get(s.name) ?? s.label;
+      el.style.display = this.hidden.has(s.name) ? 'none' : 'flex';
+      this.byName.set(s.name, el);
       const side = left ? 'left' : 'right';
       el.style.cssText = `width:${s.size}px;height:${s.size}px;${side}:calc(${s.right}px + var(--sa${left ? 'l' : 'r'}));bottom:calc(${s.bottom}px + var(--sab));`;
       el.addEventListener('pointerdown', (e) => { e.stopPropagation(); capture(el, e.pointerId); el.classList.add('down'); input.press(s.name); });
@@ -48,7 +53,19 @@ export class TouchControls {
       el.addEventListener('pointercancel', up);
       this.layer.appendChild(el);
       this.buttons.push(el);
+      if (s.name === 'interact') el.classList.add('wide');
     }
+  }
+
+  setLabel(name: ButtonName, text: string) {
+    if (this.labels.get(name) === text) return;
+    this.labels.set(name, text);
+    const el = this.byName.get(name); if (el) el.textContent = text;
+  }
+  setVisible(name: ButtonName, v: boolean) {
+    if (v === !this.hidden.has(name)) return;
+    if (v) this.hidden.delete(name); else { this.hidden.add(name); input.release(name); }
+    const el = this.byName.get(name); if (el) { el.style.display = v ? 'flex' : 'none'; el.classList.remove('down'); }
   }
 
   private isJoySide(x: number) {

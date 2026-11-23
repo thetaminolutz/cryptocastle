@@ -14,7 +14,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M2 World engine (worker chunk gen, atlas, low-res pixel pass, fog, day/night) | ✅ done |
 | M3 Smooth terrain + player & touch controls (walk, sprint, jump, climb, swim, dodge, stamina, life, 1st/3rd person) | ✅ done |
 | M4 Biomes, plants, animals, caves, ores, weather + realistic graphics overhaul | ✅ done |
-| M5 Gathering, inventory, hotbar, crafting, tools, saving | next |
+| M5 Gathering, inventory, hotbar, crafting, tools, saving + skinned hero character | ✅ done |
+| M6 Building mode, furniture, chests, beds, land claims | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -35,11 +36,28 @@ level that rises with distance. Wildlife: deer, rabbits, boars, wolves, bears,
 sheep, goats, horses, birds and fish. Weather per biome: rain, thunderstorms,
 fog, snow, sandstorms, fireflies on warm nights.
 
+**The hero** is a procedurally modelled, skinned character with a real skeleton:
+hooded cloak (spring physics), tunic, belt and pouches, bracers, boots and a
+gnarled staff, animated in code (idle, walk, run, jump, swim, climb, roll, tool
+swings, harvesting). The face under the hood stays blank until character creation.
+
+**Gathering & crafting (M5):** aim at terrain and strike to dig (hands/shovel for
+soft ground, pickaxes for stone and ore — better tiers unlock harder ores), chop
+trees with an axe, harvest plants with Use (grass → fiber, berries, mushrooms,
+herbs, reeds, stones, crystals). 50+ items, 40+ recipes at hand / workbench /
+campfire / furnace / anvil; place stations in the world (fires and torches light
+the night). Tools wear out. Inventory: 6-slot belt + 24-slot pack with drag & drop,
+long-press info and stack splitting. Saves: 3 journeys in IndexedDB, autosave
+every 2 min and when leaving the app, export/import as a file. Only changes to
+the world are saved; the rest regenerates from the seed.
+
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
-drag on the right = camera, **Jump** (tap; hold against a steep wall or a tree to
-climb; in water: swim up), **Dodge** = roll. Look down + forward in water = dive.
-◐ toggles first/third person, ☰ opens Settings.
-Keyboard: WASD, Shift sprint, Space jump/climb, Q dodge.
+drag on the right = camera, **Strike/Mine/Chop/Dig** (hold to keep swinging),
+**Use** (appears when something is in reach: harvest, place, drink, use station),
+**Jump** (hold against a wall or tree to climb; in water: swim up), **Dodge** = roll.
+Tap a belt slot to hold it. ◐ toggles first/third person, ☰ opens the menu
+(Pack, Craft, Settings, Save).
+Keyboard: WASD, Shift sprint, Space jump/climb, F strike, E use, Q dodge, 1–6 belt.
 
 ## Run locally
 
@@ -109,6 +127,8 @@ scripts/     icon generator (pixel-art PNGs, run automatically on build)
   `src/entities/animals.ts` and list it in a biome's `animals`.
 - **Player tuning** (speeds, stamina costs, fall damage): `PLAYER_TUNING` in
   `src/entities/player.ts`.
+- **Items, recipes, drops:** `src/data/items.ts` (`ITEMS`, `RECIPES`, `MINE`,
+  `TREE_DROPS`, `PLANT_DROPS`). Icons are drawn from the item's `icon` field.
 - Items, enemies, NPCs and quests will live as data tables in `src/data/`.
 
 ## Performance notes

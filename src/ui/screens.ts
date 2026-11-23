@@ -1,3 +1,4 @@
+import { saves, SaveData, formatPlayTime } from '../engine/save';
 // Opening screens: "Enter. Or turn back." and the title screen.
 const ui = () => document.getElementById('ui')!;
 
@@ -31,5 +32,48 @@ export function showEnter(onEnter: () => void, onTurnBack: () => void) {
     button('Turn back', false, () => { s.remove(); onTurnBack(); })
   );
   s.append(t, row);
+  ui().appendChild(s);
+}
+
+
+/** Save slots: continue, start new, export, delete, import. */
+export async function showSlots(onPlay: (slot: number, data: SaveData | null) => void, onBack: () => void) {
+  const s = document.createElement('div');
+  s.className = 'screen';
+  s.style.background = 'radial-gradient(ellipse at 50% 120%, #2a080c 0%, #0a0608 55%, #000 100%)';
+  const title = document.createElement('div'); title.className = 'title-sub'; title.textContent = 'CHOOSE YOUR FATE';
+  const row = document.createElement('div'); row.className = 'row';
+  const list = await saves.list();
+  list.forEach((d, i) => {
+    const card = document.createElement('div'); card.className = 'slot-card';
+    const h = document.createElement('h3'); h.textContent = `JOURNEY ${i + 1}`;
+    const meta = document.createElement('div'); meta.className = 'meta';
+    meta.textContent = d ? `Day ${d.day + 1} · ${formatPlayTime(d.playTime)} played\nSeed ${d.seed} · ${new Date(d.updated).toLocaleDateString()}` : 'An empty path.';
+    meta.style.whiteSpace = 'pre-line';
+    card.append(h, meta);
+    card.appendChild(button(d ? 'Continue' : 'New journey', true, () => { s.remove(); onPlay(i, d); }));
+    if (d) {
+      card.appendChild(button('Export file', false, () => saves.exportFile(d)));
+      card.appendChild(button('Delete', false, async () => {
+        if (!confirm(`Delete journey ${i + 1}? This cannot be undone.`)) return;
+        await saves.remove(i); s.remove(); showSlots(onPlay, onBack);
+      }));
+    }
+    row.appendChild(card);
+  });
+  const bottom = document.createElement('div'); bottom.className = 'row';
+  bottom.append(
+    button('Import save file', false, async () => {
+      const d = await saves.importFile();
+      if (!d) { alert('That file is not a Duskmere save.'); return; }
+      const cur = await saves.list();
+      let slot = cur.findIndex((x) => !x);
+      if (slot < 0) { slot = Number(prompt('All slots are full. Overwrite which journey? (1-3)', '1')) - 1; if (!(slot >= 0 && slot < 3)) return; }
+      d.slot = slot; await saves.write(d); s.remove(); showSlots(onPlay, onBack);
+    }),
+    button('Back', false, () => { s.remove(); onBack(); })
+  );
+  s.append(title, row, bottom);
+  s.style.overflowY = 'auto';
   ui().appendChild(s);
 }

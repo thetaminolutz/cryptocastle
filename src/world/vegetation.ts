@@ -428,7 +428,7 @@ class InstanceSet {
   }
 }
 
-class PropLayer {
+export class PropLayer {
   readonly mesh: THREE.Mesh;
   readonly shadowMesh: THREE.Mesh | null = null;
   readonly main: InstanceSet;
@@ -558,8 +558,9 @@ export class Vegetation {
   }
 
   setChunk(key: string, trees: Float32Array, plants: Float32Array) {
-    if (trees.length) { this.treeData.set(key, trees); this.treesDirty = true; }
-    if (plants.length) { this.plantData.set(key, plants); this.plantsDirty = true; }
+    if (trees.length) this.treeData.set(key, trees); else this.treeData.delete(key);
+    if (plants.length) this.plantData.set(key, plants); else this.plantData.delete(key);
+    this.treesDirty = true; this.plantsDirty = true;
   }
   removeChunk(key: string) {
     if (this.treeData.delete(key)) this.treesDirty = true;

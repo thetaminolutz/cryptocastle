@@ -28,16 +28,8 @@ const ROWS: Row[] = [
   { kind: 'toggle', key: 'leftHanded', label: 'Left-handed layout' }
 ];
 
-export function openSettings(parent: HTMLElement, onClose: () => void) {
-  const overlay = document.createElement('div');
-  overlay.className = 'overlay';
-  const panel = document.createElement('div');
-  panel.className = 'panel';
-  panel.style.width = 'min(640px, 92vw)';
-  const h = document.createElement('h2');
-  h.textContent = 'SETTINGS';
-  panel.appendChild(h);
-
+/** Build the settings rows into a container. */
+export function buildSettings(panel: HTMLElement) {
   const refreshers: (() => void)[] = [];
   for (const row of ROWS) {
     const r = document.createElement('div');
@@ -90,13 +82,4 @@ export function openSettings(parent: HTMLElement, onClose: () => void) {
     ? 'Running from the Home Screen – saves are kept safely.'
     : 'Tip: in Safari tap Share → "Add to Home Screen". iOS may delete saves of websites that are not installed.';
   panel.appendChild(note);
-
-  const close = document.createElement('button');
-  close.className = 'btn primary';
-  close.textContent = 'Close';
-  close.addEventListener('click', () => { overlay.remove(); onClose(); });
-  panel.appendChild(close);
-
-  overlay.appendChild(panel);
-  parent.appendChild(overlay);
 }

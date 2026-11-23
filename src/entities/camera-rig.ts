@@ -9,6 +9,8 @@ export class CameraRig {
   yaw = Math.PI * 0.75;
   pitch = -0.2;
   firstPerson = false;
+  /** preferred third-person distance (m) */
+  distance = 4.4;
   private dist = 4.4;
   private smoothTarget = new THREE.Vector3();
   private initialised = false;
@@ -39,9 +41,9 @@ export class CameraRig {
       // shoulder offset to the right, then pull in if terrain blocks the view
       const target = new THREE.Vector3(this.smoothTarget.x, this.smoothTarget.y - 0.1, this.smoothTarget.z);
       target.x += Math.cos(this.yaw) * 0.45; target.z -= Math.sin(this.yaw) * 0.45;
-      let want = 4.4;
+      let want = this.distance;
       const p = new THREE.Vector3();
-      for (let d = 0.3; d <= 4.4; d += 0.25) {
+      for (let d = 0.3; d <= this.distance; d += 0.25) {
         p.copy(target).addScaledVector(back, d);
         if (world.sdf(p, this.n) > -0.35) { want = Math.max(0.3, d - 0.35); break; }
       }
