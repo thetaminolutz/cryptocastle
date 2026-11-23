@@ -18,7 +18,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M6 Building mode, furniture, chests, beds, land claims, blueprints | ✅ done |
 | M7 Combat, first 10 enemies, loot, death/respawn, game modes | ✅ done |
 | M8 Villages, NPCs with schedules, dialogue, shops, reputation | ✅ done |
-| M9 Opening, Ashen Stranger, Herald, Tower of the First Rite, character creation | next |
+| M9 Opening, Ashen Stranger, Herald, Tower of the First Rite, character creation | ✅ done |
+| M10 Quests, journal, map, the Pale Citadel | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -92,6 +93,24 @@ rumours, work (deliver items for gold), give gifts (they have favourites), rent
 a room at the inn, trade at the general store, smithy, alchemist, tailor or inn
 (prices follow reputation; shops have limited gold and restock every few days),
 or pickpocket, insult and threaten — word travels, and reputation is remembered.
+
+**The opening (M9):** a new journey begins at night in a moonlit clearing —
+faceless, nameless, with only a staff. An objective line (with an arrow and
+distance) leads on: toadlings ambush you at the edge of the clearing; a light in
+the woods is the **Ashen Stranger**'s campfire (he warns you of the rider with
+amber eyes); hoofbeats at the gorge announce **the Herald** on his armoured
+black horse, who states the rules. Beyond lies the **Tower of the First Rite**:
+six copper tablets, a rusty chest and a seventh tablet create your character —
+gender, one of 8 races (Human, Dark Elf, Barbarian, Vampire, Lizardfolk, Dwarf,
+Werewolf, Catfolk), your face in a copper mirror with live preview (skin, hair,
+beard, eyes, brows, nose, mouth, cheeks, scars, clothing colours, headwear), one
+of 8 callings, 10 of 18 gifts (some exclude each other), the Herald's oath
+(showing your Wanderer / One Life path), a weapon and shield from the chest, and
+a name from the cheeky Naming Gnome. The rite ends with the reveal of your new
+face outside the tower in the morning. Race, calling and gifts really change
+the numbers: life, stamina, speed, jump, swimming and breath, damage taken,
+damage dealt, crits, life steal (Vampire), fire and curse procs, block, herb
+yield, merchant prices and night vision.
 
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera (tap an enemy to lock on), **Strike/Mine/Chop/Dig** (hold to keep swinging), **Block**,

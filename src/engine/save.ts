@@ -24,6 +24,7 @@ export interface SaveData {
   building?: BuildSave;
   stats?: { gold: number; xp: number; level: number; maxLife: number; kills: Record<string, number> };
   lostPack?: { x: number; y: number; z: number; items: (Stack | null)[] } | null;
+  story?: unknown;
   villagers?: Record<string, import('../entities/villagers').NPCSave>;
   shops?: Record<string, import('../game/dialogue').ShopState>;
 }

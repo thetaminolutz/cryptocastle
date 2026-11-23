@@ -247,6 +247,42 @@ const MODELS: Record<string, () => THREE.BufferGeometry> = {
     box(b, 0.4, 1.2, 0.4, 0, 2.9, 0, 'stone_brick');
     return b.build();
   },
+  tablet: () => {
+    const b = new GeoBuilder();
+    box(b, 0.62, 0.82, 0.04, 0, 1.45, -0.02, 'ore_copper', [1.1, 0.75, 0.45]);
+    box(b, 0.7, 0.06, 0.06, 0, 1.88, -0.03, 'white', [0.35, 0.22, 0.12]);
+    for (let i = 0; i < 5; i++) box(b, 0.42 - (i % 2) * 0.1, 0.02, 0.01, 0, 1.68 - i * 0.1, -0.045, 'white', [0.18, 0.1, 0.05]);
+    return b.build();
+  },
+  rite_chest: () => {
+    const b = new GeoBuilder();
+    box(b, 0.9, 0.42, 0.6, 0, 0.21, 0, 'planks', [0.55, 0.45, 0.38]);
+    const lid = new THREE.CylinderGeometry(0.3, 0.3, 0.9, 10, 1, false, 0, Math.PI); lid.rotateZ(Math.PI / 2); lid.rotateX(Math.PI / 2); lid.scale(1, 0.55, 1); lid.translate(0, 0.42, 0);
+    b.add(lid, { layer: 'planks', color: [0.55, 0.45, 0.38] });
+    for (const x of [-0.32, 0.32]) box(b, 0.06, 0.45, 0.62, x, 0.23, 0, 'ore_iron', [0.7, 0.45, 0.3]);
+    return b.build();
+  },
+  flag_one: () => {
+    const b = new GeoBuilder();
+    log(b, 0, 0, 0, 3.4, 0.05);
+    const cloth = new THREE.PlaneGeometry(1.4, 0.9, 6, 1); cloth.translate(0.72, 3.0, 0);
+    b.add(cloth, { layer: 'fabric', color: [0.45, 0.08, 0.07], wind: (p) => p.x * 1.2 });
+    const one = new THREE.PlaneGeometry(0.14, 0.6); one.translate(0.72, 3.0, -0.005);
+    b.add(one, { layer: 'fabric', color: [0.85, 0.78, 0.6], wind: (p) => p.x * 1.2 });
+    return b.build();
+  },
+  straw: () => {
+    const b = new GeoBuilder();
+    const g = new THREE.SphereGeometry(0.7, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2); g.scale(1, 0.35, 0.8);
+    b.add(g, { layer: 'thatch', color: [1.1, 1.0, 0.8] });
+    return b.build();
+  },
+  bones: () => {
+    const b = new GeoBuilder();
+    const skull = new THREE.SphereGeometry(0.1, 8, 6); skull.scale(1, 0.9, 1.15); skull.translate(0, 0.08, 0); b.add(skull, { layer: 'white', color: [0.85, 0.82, 0.72] });
+    for (let i = 0; i < 5; i++) { const g = new THREE.CylinderGeometry(0.02, 0.02, 0.4, 5); g.rotateZ(Math.PI / 2); g.rotateY(i * 1.3); g.translate(Math.cos(i) * 0.3, 0.03, Math.sin(i * 2) * 0.25); b.add(g, { layer: 'white', color: [0.82, 0.78, 0.68] }); }
+    return b.build();
+  },
   claim_stone: () => {
     const b = new GeoBuilder();
     const g = new THREE.CylinderGeometry(0.22, 0.32, 1.3, 6); g.translate(0, 0.65, 0); b.add(g, { layer: 'stone_brick', color: [0.8, 0.8, 0.85] });

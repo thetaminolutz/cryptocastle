@@ -6,7 +6,7 @@ export const WALL_H = 2.4;
 
 export type Snap = 'cell' | 'edge' | 'corner' | 'free';
 export type PieceCat = 'structure' | 'furniture' | 'light';
-export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim';
+export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim' | 'tablet' | 'rite';
 
 /** Local axis-aligned collision box: [minX, minY, minZ, maxX, maxY, maxZ] (rot 0, facing -Z). */
 export type Box = [number, number, number, number, number, number];
@@ -71,6 +71,13 @@ P({ id: 'altar', name: 'Altar', cat: 'furniture', snap: 'free', cost: [], boxes:
 P({ id: 'pew', name: 'Pew', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.8, 0, -0.22, 0.8, 0.5, 0.22]], top: 0.5, use: 'sit', icon: 'chair', hidden: true });
 P({ id: 'anvil_piece', name: 'Anvil', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.35, 0, -0.25, 0.35, 0.85, 0.25]], top: 0.85, icon: 'table', hidden: true });
 P({ id: 'forge', name: 'Forge', cat: 'light', snap: 'free', cost: [], boxes: [[-0.7, 0, -0.5, 0.7, 0.95, 0.5]], top: 0.95, light: [3, 1.4, 0.4, 9], icon: 'fireplace', hidden: true });
+
+// ---- the Tower of the First Rite
+P({ id: 'tablet', name: 'Copper Tablet', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, use: 'tablet', icon: 'painting', hidden: true });
+P({ id: 'rite_chest', name: 'Rusty Chest', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.45, 0, -0.3, 0.45, 0.6, 0.3]], top: 0.6, use: 'rite', icon: 'chest', hidden: true });
+P({ id: 'flag_one', name: 'Faded Flag', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'banner', hidden: true });
+P({ id: 'straw', name: 'Straw', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'carpet', hidden: true });
+P({ id: 'bones', name: 'Bones', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'carpet', hidden: true });
 
 export const CLAIM_RADIUS = 22;
 

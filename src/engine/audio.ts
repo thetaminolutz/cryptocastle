@@ -52,6 +52,10 @@ class AudioEngine {
   impact(heavy = false) { this.noise(heavy ? 0.25 : 0.14, heavy ? 300 : 600, 'lowpass', heavy ? 0.9 : 0.6); this.tone(heavy ? 90 : 140, 0.12, 'sine', 0.5, 50); }
   block() { this.tone(820, 0.18, 'triangle', 0.35, 600); this.noise(0.1, 2500, 'highpass', 0.25); }
   parry() { this.tone(1400, 0.35, 'triangle', 0.4, 1800); this.tone(2100, 0.25, 'sine', 0.2); }
+  /** a heavy hoofbeat (two thuds) */
+  hoof(vol = 1) { this.noise(0.09, 180, 'lowpass', 0.8 * vol); this.tone(70, 0.08, 'sine', 0.5 * vol, 40); }
+  /** an eerie breath when a story voice begins */
+  whisper() { this.noise(0.9, 1800, 'bandpass', 0.18, 3, 700); this.tone(220, 0.9, 'sine', 0.06, 180); }
   /** sharp warning sound when the player is hit */
   hurt() { this.tone(980, 0.16, 'square', 0.22, 420); this.noise(0.12, 400, 'lowpass', 0.5); }
 

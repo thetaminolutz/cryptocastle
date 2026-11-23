@@ -36,6 +36,7 @@ export const U = {
   uWaterShallow: { value: new THREE.Color(0.05, 0.22, 0.2) },
   uWaterDeep: { value: new THREE.Color(0.004, 0.03, 0.05) },
   uNight: { value: 0 },
+  uNightEye: { value: 0 },
   uShadowMap: { value: null as THREE.Texture | null },
   uShadowMatrix: { value: new THREE.Matrix4() },
   uShadowOn: { value: 0 },
@@ -70,7 +71,7 @@ uniform sampler2DArray uNormalMap;
 uniform sampler2D uNoise;
 uniform float uTime;
 uniform vec3 uLightDir, uLightColor, uSunDir, uSunGlow, uSkyAmb, uGroundAmb, uBlockColor, uZenith, uHorizon, uFogColor;
-uniform float uFogNear, uFogFar, uFogDensity, uFogHeight, uWetness, uNight;
+uniform float uFogNear, uFogFar, uFogDensity, uFogHeight, uWetness, uNight, uNightEye;
 uniform vec3 uWaterShallow, uWaterDeep;
 uniform sampler2DShadow uShadowMap;
 uniform mat4 uShadowMatrix;
@@ -141,7 +142,8 @@ vec3 shade(vec3 albedo, vec3 n, float ao, float sky, float blk, float shadow, fl
   float ndl = max((dot(n, uLightDir) + wrap) / (1.0 + wrap), 0.0);
   vec3 amb = mix(uGroundAmb, uSkyAmb, n.y * 0.5 + 0.5);
   float skyL = sky * sky;
-  return albedo * (uLightColor * ndl * shadow * skyL + amb * ao * (0.06 + 0.94 * skyL) + uBlockColor * blk * blk * ao);
+  return albedo * (uLightColor * ndl * shadow * skyL + amb * ao * (0.06 + 0.94 * skyL) + uBlockColor * blk * blk * ao
+    + vec3(0.05, 0.075, 0.09) * uNightEye * uNight * ao);
 }
 `;
 

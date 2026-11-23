@@ -10,6 +10,7 @@ import { B } from './blocks';
 import { CHUNK_HEIGHT, CHUNK_SIZE, SEA_LEVEL } from './constants';
 import { Biome, BIOMES, CLIMATE_BIOMES, Plant } from './biomes';
 import { villageAt, flattenWeight, isVillageHeightOk, VillageSite } from './villages';
+import { SPRING, GORGE, TOWER, CAMPFIRE } from '../data/story';
 
 export const PAD = CHUNK_SIZE + 2;           // padded width (18): grid points -1..16
 export const PAD_LAYER = PAD * PAD;
@@ -114,6 +115,17 @@ export class TerrainGen {
   /** Column including village flattening. */
   column(x: number, z: number): Column {
     const c = this.rawColumn(x, z);
+    // the Tower of the First Rite stands on level ground
+    const td = Math.hypot(x - TOWER.x, z - TOWER.z);
+    if (td < 22) {
+      if (this.towerH === null) this.towerH = this.rawColumn(TOWER.x, TOWER.z).height;
+      const w = Math.max(0, Math.min(1, (22 - td) / 9));
+      c.height = c.height * (1 - w) + (this.towerH + 0.2) * w;
+      c.village = Math.max(c.village, w);
+    }
+    // a small glade around the Ashen Stranger's campfire (no trees, so the light shows)
+    const cd = Math.hypot(x - CAMPFIRE.x, z - CAMPFIRE.z);
+    if (cd < 9) c.village = Math.max(c.village, Math.min(1, (9 - cd) / 3) * 0.6);
     const v = this.village(x, z);
     if (v) {
       const w = flattenWeight(v, x, z);
@@ -134,6 +146,7 @@ export class TerrainGen {
   };
   village(x: number, z: number): VillageSite | null { return villageAt(x, z, this.seed, this.rawFn); }
 
+  private towerH: number | null = null;
   private rawColumn(x: number, z: number): Column {
     const n = this.n;
     const d2 = (x * x + z * z) / (260 * 260);
@@ -174,6 +187,12 @@ export class TerrainGen {
       const pool = n[17].fbm2(x / 70, z / 70, 3);
       if (pool > 0.3) { const dip = smooth(0.3, 0.5, pool) * 4; liquidLevel = Math.floor(h - 1); h -= dip; liquid = B.LAVA; }
     }
+    // opening: a spring near the start, and the gorge beyond the woods
+    const sd = Math.hypot(x - SPRING.x, z - SPRING.z);
+    if (sd < SPRING.r + 1.5) { const t = Math.max(0, 1 - sd / (SPRING.r + 1.5)); h -= t * t * 2.6; if (sd < SPRING.r) { liquidLevel = SEA_LEVEL + 5; liquid = B.WATER; } }
+    const gx = Math.max(GORGE.x0, Math.min(GORGE.x1, x));
+    const gd = Math.hypot(x - gx, z - GORGE.z);
+    if (gd < GORGE.r) h -= Math.sqrt(1 - gd / GORGE.r) * GORGE.depth;
     const height = Math.max(4, Math.min(CHUNK_HEIGHT - 10, h));
     const floating = weights.find((e) => e.b === Biome.FloatingRocks)?.w ?? 0;
     const crystal = smooth(0.35, 0.55, n[18].fbm2(x / 380, z / 380, 2));

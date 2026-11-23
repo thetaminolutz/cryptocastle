@@ -55,6 +55,8 @@ export class Combat {
   }
 
   /** Damage multiplier from levels. */
+  /** character perks: damage, life steal, fire/curse chance, extra block, crit chance */
+  perks = { dmg: 1, lifesteal: 0, fire: 0, curse: 0, block: 0, crit: 0.08 };
   get power() { return 1 + (this.level - 1) * 0.04; }
 
   get shield(): number {
@@ -109,18 +111,21 @@ export class Combat {
     const p = this.player;
     const held = this.inv.held?.id;
     const w = weaponOf(held);
-    const mult = (heavy ? 2.2 : combo >= 2 ? 1.45 : 1) * this.power;
+    const mult = (heavy ? 2.2 : combo >= 2 ? 1.45 : 1) * this.power * this.perks.dmg;
     const origin = p.pos.clone().setY(p.pos.y + 1);
     // with a locked target, swing toward it
     if (this.lock && this.lock.pos.distanceTo(p.pos) < w.reach + 2) p.yaw = Math.atan2(-(this.lock.pos.x - p.pos.x), -(this.lock.pos.z - p.pos.z));
     let hit = false;
     for (const c of this.creatures.inArc(p.pos, p.yaw, w.reach + (heavy ? 0.3 : 0))) {
-      const crit = Math.random() < 0.08;
+      const crit = Math.random() < this.perks.crit;
       const dmg = this.creatures.damage(c, w.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.2), w.type, p.pos, heavy);
       const eff = (c.def.weak[w.type] ?? 1);
       this.number(c.pos.clone().setY(c.pos.y + c.def.height + c.hover), String(Math.round(dmg)), eff > 1.05 ? '#ffd040' : eff < 0.95 ? '#9a9a9a' : '#ffffff', crit || heavy);
       this.lastHit = c;
       hit = true;
+      if (this.perks.lifesteal) p.life = Math.min(p.maxLife, p.life + dmg * this.perks.lifesteal);
+      if (c.state !== 'dead' && Math.random() < this.perks.fire) c.burn = Math.max(c.burn, 3);
+      if (c.state !== 'dead' && Math.random() < this.perks.curse) { this.creatures.damage(c, c.maxHp * 0.06, 'shadow', p.pos, false); this.number(c.pos.clone().setY(c.pos.y + c.def.height + 0.4), 'Cursed', '#b080e0'); }
       if (c.state === 'dead') this.onKill(c);
     }
     for (const a of this.wildlife.inArc(p.pos, p.yaw, w.reach)) {
@@ -172,7 +177,7 @@ export class Combat {
         this.hooks.shake(0.08);
         return;
       }
-      const block = this.shield || 0.55;
+      const block = Math.min(0.95, (this.shield || 0.55) + this.perks.block);
       const cost = dmg * (this.shield ? 0.8 : 1.2);
       p.stamina -= cost;
       dmg *= 1 - block;
@@ -181,6 +186,7 @@ export class Combat {
       status = undefined;
     }
     if (this.status.has('curse')) dmg *= 1.3;
+    dmg *= p.takenMul;
     p.damage(dmg, name.toLowerCase().startsWith('a') ? `an ${name.toLowerCase()}` : `a ${name.toLowerCase()}`);
     this.number(p.pos.clone().setY(p.pos.y + 2), String(Math.round(dmg)), '#ff5a4a');
     this.hooks.shake(Math.min(0.4, 0.08 + dmg / 60));

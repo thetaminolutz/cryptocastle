@@ -37,6 +37,10 @@ import { HOTBAR, Stack } from './inventory';
 import { Villagers } from '../entities/villagers';
 import { Dialogue, biomeName } from './dialogue';
 import type { AABB } from '../world/building';
+import { Story, StorySave } from './story';
+import { openCreation } from '../ui/creation';
+import { applyProfile, Traits } from './profile';
+import { TOWER } from '../data/story';
 
 const SPAWN = { x: 0.5, z: 0.5 };
 
@@ -93,6 +97,9 @@ export class Game {
   private sunLight = new THREE.DirectionalLight(0xffffff, 1);
   private hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
   private fog = new THREE.Fog(0x000000, 40, 96);
+  readonly story: Story;
+  traits!: Traits;
+  private creating = false;
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement, private start0: GameStart) {
     const seed = start0.seed;
@@ -139,6 +146,7 @@ export class Game {
       setAttack: (l) => this.touch.setLabel('attack', l),
       toast: (t, c) => this.hotbar.notify(t, c),
       openCrafting: () => { this.setPaused(true); this.menu.open('crafting'); },
+      special: (p) => this.story.useSpecial(p),
       openChest: (p) => { if (p.gen) { this.hotbar.notify('This chest belongs to someone else.', '#e08070'); return; } if (p.items) { this.setPaused(true); this.menu.openChest(p.items); } },
       sleep: (p) => {
         if (p.gen && !(this.rentedBed && Math.hypot(this.rentedBed.x - p.x, this.rentedBed.z - p.z) < 1.5)) { this.hotbar.notify('This bed is not yours. Rent a room from the innkeeper.', '#e08070'); return; }
@@ -167,7 +175,7 @@ export class Game {
     this.dialogue = new Dialogue(ui, this.inventory, this.villagers, {
       gold: () => this.gold, addGold: (n) => { this.gold = Math.max(0, this.gold + n); },
       hours: () => this.sky.hours, day: () => this.sky.day, weather: () => this.weather.kind,
-      playerName: () => 'stranger',
+      playerName: () => this.story.profile.created ? this.story.profile.name : 'stranger',
       biomeToward: (dx, dz) => biomeName(this.gen.column(Math.floor(this.player.pos.x + dx * 400), Math.floor(this.player.pos.z + dz * 400)).biome),
       rentRoom: (n) => {
         const bed = this.villagers.villageOf(n).layout.buildings.find((b) => b.kind === 'tavern')?.beds[0];
@@ -177,13 +185,14 @@ export class Game {
       toast: (t, c) => this.hotbar.notify(t, c),
       onOpen: () => { this.touch.setVisible('interact', false); },
       onClose: () => {},
-      priceMul: () => 1
+      priceMul: () => this.traits?.priceMul ?? 1
     });
     this.villagers.onEnterVillage = (v) => {
       this.hud.showRegion(v.site.name, `Village · ${Math.round(this.villagers.villageRep(v.site.id)) >= 25 ? 'You are welcome here' : 'Strangers are watched here'}`);
       void this.save();
     };
     this.interaction.extra = () => {
+      if (this.story.nearStranger() && !this.story.busy) return { label: 'Speak to the Stranger', run: () => this.story.talkStranger() };
       const lp = this.lostPack;
       if (!lp || this.player.pos.distanceTo(new THREE.Vector3(lp.x, lp.y, lp.z)) > 2.5) {
         const npc = this.dialogue.isOpen ? null : this.villagers.talkable(this.player.pos, this.player.yaw);
@@ -196,6 +205,23 @@ export class Game {
         this.hotbar.notify(lost ? 'You recover what you can carry.' : 'You recover your belongings.', '#e8d8a8');
       } };
     };
+    this.story = new Story(ui, this.world, this.building, this.player, this.creatures, this.props, {
+      toast: (t, c) => this.hotbar.notify(t, c),
+      objective: (t, at) => this.hud.setObjective(t, at, this.player.pos, this.rig.yaw),
+      setTime: (t) => { this.sky.time = t; },
+      openCreation: (step, done) => {
+        this.creating = true;
+        this.touch.setVisible('interact', false);
+        openCreation(ui, step, this.story.profile, { mode: this.start0.mode }, {
+          preview: (look) => this.model.setLook(look),
+          give: (id, n) => { const left = this.inventory.add(id, n); if (left) this.hotbar.notify('Your pack is full.', '#e08070'); },
+          toast: (t, c) => this.hotbar.notify(t, c),
+          close: () => { this.creating = false; this.rig.distance = 4.4; this.applyProfile(); }
+        }, () => { done(); void this.save(); });
+      },
+      reveal: () => this.reveal()
+    });
+    this.scene.add(this.story.group);
     this.touch.onTap = (x, y) => {
       if (this.build.active) return;
       const ndc = new THREE.Vector2((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
@@ -218,9 +244,13 @@ export class Game {
       this.lostPack = d.lostPack ?? null;
       this.villagers.saved = d.villagers ?? {};
       this.dialogue.shops = d.shops ?? {};
+      this.story.load(d.story as StorySave | undefined);
     } else {
       this.inventory.add('staff', 1);
+      this.story.begin();
     }
+    this.model.setLook(this.story.profile.created ? this.story.profile.look : null);
+    this.applyProfile();
 
     this.player.onDamage = () => this.hud.hurt();
     this.player.onDeath = (cause) => this.die(cause);
@@ -263,7 +293,8 @@ export class Game {
       stats: { gold: this.gold, xp: this.combat.xp, level: this.combat.level, maxLife: this.player.maxLife, kills: this.creatures.kills },
       lostPack: this.lostPack,
       villagers: this.villagers.serialize(),
-      shops: this.dialogue.shops
+      shops: this.dialogue.shops,
+      story: this.story.serialize()
     };
   }
 
@@ -294,10 +325,10 @@ export class Game {
       const day = this.sky.day + 1, level = this.combat.level;
       void (async () => {
         await saves.remove(this.start0.slot);
-        await saves.addGrave({ name: 'The Nameless One', cause, day, level, date: Date.now(), seed: this.start0.seed });
+        await saves.addGrave({ name: this.story.profile.name, cause, day, level, date: Date.now(), seed: this.start0.seed });
       })();
       this.spawned = false; // no more saving
-      setTimeout(() => showDeath('HERE ENDS THE JOURNEY', `The Nameless One — a ${levelWord(level)} — died of ${cause} on day ${day}. A stone in the Cemetery of the Fallen now bears their name. There was only ever one chance.`, 'Return', () => { location.href = location.pathname; }), 1500);
+      setTimeout(() => showDeath('HERE ENDS THE JOURNEY', `${this.story.profile.name} — a ${levelWord(level)} — died of ${cause} on day ${day}. A stone in the Cemetery of the Fallen now bears their name. There was only ever one chance.`, 'Return', () => { location.href = location.pathname; }), 1500);
       return;
     }
     const lostGold = Math.floor(this.gold * 0.1);
@@ -310,6 +341,31 @@ export class Game {
     setTimeout(() => showDeath('YOU HAVE FALLEN', `You died of ${cause}.${lostGold ? ` ${lostGold} gold slipped from your purse.` : ''}${items.length ? ' Your pack lies where you fell — go back for it.' : ''}`, 'Wake', () => {
       this.respawn(); this.dying = false; void this.save();
     }), 1200);
+  }
+
+  /** Re-derive stats and perks from the character profile. */
+  applyProfile() {
+    this.traits = applyProfile(this.story.profile, this.player, this.combat, this.interaction, this.combat.level);
+    U.uNightEye.value = this.traits.nightEye ? 1 : 0;
+  }
+
+  /** The end of the First Rite: fade, the new face, morning outside the tower. */
+  private reveal() {
+    const fade = document.createElement('div'); fade.className = 'fade'; fade.textContent = this.story.profile.name.toUpperCase();
+    document.getElementById('ui')!.appendChild(fade);
+    requestAnimationFrame(() => { fade.style.opacity = '1'; });
+    setTimeout(() => {
+      this.model.setLook(this.story.profile.look);
+      this.applyProfile();
+      this.player.life = this.player.maxLife; this.player.stamina = this.player.tune.staminaMax;
+      const x = TOWER.x + 0.5, z = TOWER.z + 7;
+      this.player.spawn(x, this.world.groundY(x, z) + 0.1, z);
+      this.player.yaw = 0; this.rig.yaw = Math.PI; this.rig.pitch = -0.1;
+      fade.style.opacity = '0';
+      setTimeout(() => fade.remove(), 1300);
+      this.hud.showRegion(this.story.profile.name, 'The First Rite is done');
+      void this.save();
+    }, 1600);
   }
 
   /** Sleep in a bed: sets the respawn point; at night, skip to morning. */
@@ -368,7 +424,12 @@ export class Game {
     if (this.spawned) {
       this.building.boxesNear(this.player.pos, 3, this.boxes);
       this.player.boxes = this.boxes;
-      this.player.update(dt, this.world, this.rig.yaw, this.rig.pitch, this.rig.firstPerson);
+      if (this.creating) {
+        // the copper mirror: look at the hero's face
+        this.rig.yaw += (this.player.yaw + Math.PI - this.rig.yaw) * Math.min(1, dt * 4);
+        this.rig.pitch += (-0.05 - this.rig.pitch) * Math.min(1, dt * 4);
+        this.rig.distance = 2.3;
+      } else this.player.update(dt, this.world, this.rig.yaw, this.rig.pitch, this.rig.firstPerson);
       this.props.collide(this.player.pos);
       this.playTime += dt;
       this.autosave -= dt;
@@ -391,12 +452,13 @@ export class Game {
       cam.position.x += (Math.random() - 0.5) * this.shake; cam.position.y += (Math.random() - 0.5) * this.shake;
       this.shake *= Math.exp(-dt * 10);
     }
-    if (this.spawned && !this.build.active) this.interaction.update(dt, cam, this.elapsed);
+    if (this.spawned && !this.build.active && !this.creating && !this.story.busy) this.interaction.update(dt, cam, this.elapsed);
     if (this.spawned) {
       this.combat.update(dt, cam);
       this.creatures.update(dt, this.player.pos, this.sky.isNight);
       this.villagers.update(dt, this.player.pos, this.sky.hours, cam);
       this.villagers.tickDoors(dt);
+      this.story.update(dt, this.elapsed);
       if (this.dialogue.isOpen && this.player.speed > 1) this.dialogue.close();
       this.model.blocking = this.player.blocking;
       const sh = [0, 1, 2, 3, 4, 5].map((i) => this.inventory.slots[i]).find((x) => x && ITEMS[x.id].shield);

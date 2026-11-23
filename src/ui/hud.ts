@@ -19,6 +19,8 @@ export class Hud {
   private statusRow: HTMLDivElement;
   private level: HTMLDivElement;
   readonly lockMark: HTMLDivElement;
+  private objective: HTMLDivElement;
+  private objKey = '';
   private bannerTimer = 0;
   private last = '';
 
@@ -64,6 +66,8 @@ export class Hud {
     bars.appendChild(this.statusRow);
     this.level = document.createElement('div'); this.level.className = 'hud-level';
     bars.appendChild(this.level);
+    this.objective = document.createElement('div'); this.objective.className = 'hud-objective';
+    bars.appendChild(this.objective);
     this.lockMark = document.createElement('div'); this.lockMark.className = 'lock-mark';
     this.banner = document.createElement('div');
     this.banner.className = 'region-banner';
@@ -96,6 +100,24 @@ export class Hud {
     this.statusRow.dataset.k = key;
     this.statusRow.innerHTML = '';
     for (const [t, c] of list) { const e = document.createElement('span'); e.textContent = t; e.style.borderColor = c; e.style.color = c; this.statusRow.appendChild(e); }
+  }
+  /** Current story objective with a little arrow toward it (relative to the camera). */
+  setObjective(text: string | null, at: { x: number; z: number } | null, from: { x: number; z: number }, camYaw: number) {
+    if (!text) { if (this.objKey) { this.objKey = ''; this.objective.style.display = 'none'; } return; }
+    let arrow = '', dist = '';
+    if (at) {
+      const dx = at.x - from.x, dz = at.z - from.z;
+      const d = Math.hypot(dx, dz);
+      const ang = Math.atan2(-dx, -dz) - camYaw; // 0 = straight ahead
+      const dirs = ['↑', '↖', '←', '↙', '↓', '↘', '→', '↗'];
+      arrow = d < 4 ? '•' : dirs[((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8];
+      dist = d < 4 ? '' : ` ${Math.round(d)} m`;
+    }
+    const key = `${text}|${arrow}|${dist}`;
+    if (key === this.objKey) return;
+    this.objKey = key;
+    this.objective.style.display = 'block';
+    this.objective.innerHTML = `<span class="obj-arrow">${arrow}</span> ${text}<small>${dist}</small>`;
   }
   setLevel(level: number, frac: number) { this.level.textContent = `Lv ${level}`; this.level.style.setProperty('--xp', `${frac * 100}%`); }
 

@@ -28,6 +28,12 @@ export class Player {
   /** Body facing (radians, same convention as camera yaw). */
   yaw = 0;
   state: PlayerState = 'air';
+  /** per-character tuning (race, calling and gifts modify a copy) */
+  tune = { ...PLAYER_TUNING };
+  /** fraction of incoming damage taken (iron skin, races) */
+  takenMul = 1;
+  /** life regeneration speed */
+  regenMul = 1;
   maxLife = PLAYER_TUNING.lifeMax;
   life = PLAYER_TUNING.lifeMax;
   /** combat state (set by the combat system) */
@@ -69,8 +75,8 @@ export class Player {
     this.pos.set(x, y, z);
     this.vel.set(0, 0, 0);
     this.life = this.maxLife;
-    this.stamina = PLAYER_TUNING.staminaMax;
-    this.breath = PLAYER_TUNING.breathMax;
+    this.stamina = this.tune.staminaMax;
+    this.breath = this.tune.breathMax;
     this.dead = false;
     this.state = 'air';
   }
@@ -87,9 +93,9 @@ export class Player {
     if (this.dead || !world.isLoaded(this.pos.x, this.pos.z)) return;
     if (this.sitting) {
       if (Math.hypot(input.move.x, input.move.y) > 0.3 || input.button('jump').pressed) this.sitting = false;
-      else { this.vel.set(0, 0, 0); this.speed = 0; this.state = 'ground'; this.stamina = Math.min(PLAYER_TUNING.staminaMax, this.stamina + 30 * dt); return; }
+      else { this.vel.set(0, 0, 0); this.speed = 0; this.state = 'ground'; this.stamina = Math.min(this.tune.staminaMax, this.stamina + 30 * dt); return; }
     }
-    const T = PLAYER_TUNING;
+    const T = this.tune;
 
     // ---- input → wish direction (relative to camera)
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
@@ -216,7 +222,7 @@ export class Player {
 
     // ---- life regeneration
     this.sinceDamage += dt;
-    if (this.sinceDamage > 6) this.life = Math.min(this.maxLife, this.life + 1.5 * dt);
+    if (this.sinceDamage > 6 / this.regenMul) this.life = Math.min(this.maxLife, this.life + 1.5 * this.regenMul * dt);
 
     // ---- facing
     this.speed = Math.hypot(this.vel.x, this.vel.z);

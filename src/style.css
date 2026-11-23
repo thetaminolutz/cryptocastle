@@ -249,3 +249,38 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .shop-row img { width: 36px; height: 36px; }
 .shop-row span { flex: 1; font-size: 14px; }
 .shop-row .btn { min-width: 76px; min-height: 44px; font-size: 14px; padding: 4px 8px; }
+
+/* ---- story objective */
+.hud-objective { display: none; margin-top: 6px; font-size: 14px; color: #f0e0b0; text-shadow: 1px 1px 0 #000, 0 0 6px #000; max-width: 300px; }
+.hud-objective .obj-arrow { display: inline-block; width: 18px; color: var(--gold); font-weight: bold; }
+.hud-objective small { color: #a8987c; margin-left: 6px; }
+
+/* ---- the First Rite (character creation) */
+.creation { position: absolute; inset: 0; display: flex; align-items: stretch; justify-content: flex-start; pointer-events: auto; background: linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,0) 60%); }
+.creation-panel { position: relative; width: min(520px, 58vw); margin: calc(12px + var(--sat)) 0 calc(12px + var(--sab)) calc(12px + var(--sal)); display: flex; flex-direction: column; max-height: none; }
+.cr-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 4px; }
+.cr-foot { display: flex; gap: 10px; justify-content: space-between; margin-top: 12px; }
+.cr-foot .btn { flex: 1; }
+.cr-foot .btn:disabled { opacity: .4; }
+.cr-intro { color: #c8b890; font-style: italic; margin: 0 0 12px; line-height: 1.5; }
+.cr-info { color: var(--ink); margin: 10px 0; line-height: 1.5; }
+.cr-info i { color: #c8a868; }
+.cr-row { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cr-row label { color: #a8987c; font-size: 13px; letter-spacing: 1px; }
+.cr-row input[type=range] { width: 100%; accent-color: var(--gold); height: 30px; }
+.cr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cr-chip { min-height: 38px; min-width: 44px; padding: 0 12px; background: #1a1210; color: var(--ink); border: 2px solid #4a3020; font: inherit; font-size: 14px; }
+.cr-chip.swatch { min-width: 38px; padding: 0; }
+.cr-chip.on { border-color: var(--gold); box-shadow: 0 0 8px rgba(216,169,58,.5); }
+.cr-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.cr-card { text-align: left; background: #1a1210; color: var(--ink); border: 2px solid #4a3020; padding: 10px; font: inherit; min-height: 64px; }
+.cr-card b { display: block; color: var(--gold); letter-spacing: 1px; margin-bottom: 4px; }
+.cr-card span { font-size: 12px; color: #b8a888; line-height: 1.35; }
+.cr-card em { color: #c87060; font-style: normal; }
+.cr-card.on { border-color: var(--gold); background: #2a1c10; box-shadow: 0 0 10px rgba(216,169,58,.4); }
+.cr-card:disabled { opacity: .35; }
+.cr-gnome { color: var(--ink); line-height: 1.5; }
+.cr-gnome b { color: #a8d080; }
+.cr-name { width: 100%; font: inherit; font-size: 22px; padding: 10px; margin: 8px 0 12px; background: #0e0a08; color: #f0e0c0; border: 2px solid var(--gold); letter-spacing: 2px; }
+.cr-oath p { margin: 6px 0; font-size: 17px; color: #e8c890; letter-spacing: 1px; }
+.cr-oath .cr-mode { margin-top: 14px; color: var(--ink); font-size: 15px; }

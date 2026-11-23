@@ -6,6 +6,7 @@
 // creation gives it one.
 import * as THREE from 'three';
 import type { Player } from './player';
+import { Look, RACES, HAIR_COLORS, CLOTH_COLORS } from '../data/character';
 
 type V3 = THREE.Vector3;
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -140,9 +141,12 @@ const B = BONES;
 const R = (y: number, x: number, z: number, rx: number, rz: number, w: Weights): Ring => ({ c: V(x, y, z), rx, rz, w });
 const mixW = (a: number, b: number, t: number): Weights => [[a, 1 - t], [b, t]];
 
-function buildBody(b: SkinBuilder) {
+function buildBody(b: SkinBuilder, look: Look | null = null) {
   // palette
-  const SKIN = 0xc4b6aa, TUNIC = 0x5a3d2b, PANTS = 0x3a3330, LEATHER = 0x4a3020, BOOT = 0x2e221a, CLOAK = 0x2a3a34, HOOD_IN = 0x120e0c, BRASS = 0xb08a40;
+  const race = look ? RACES.find((r) => r.id === look.race)! : null;
+  const SKIN = look ? race!.skin[look.skin % race!.skin.length] : 0xc4b6aa;
+  const TUNIC = look ? CLOTH_COLORS[look.jacket] : 0x5a3d2b, PANTS = look ? CLOTH_COLORS[look.trousers] : 0x3a3330;
+  const LEATHER = 0x4a3020, BOOT = look ? [0x2e221a, 0x4a3020, 0x1a1a1c, 0x5a4a3a][look.boots % 4] : 0x2e221a, CLOAK = 0x2a3a34, HOOD_IN = 0x120e0c, BRASS = 0xb08a40;
 
   // ---- legs (pants) with knee blending
   for (const s of [-1, 1]) {
@@ -221,14 +225,19 @@ function buildBody(b: SkinBuilder) {
   b.loft(M.Skin, [R(1.5, 0, 0.01, 0.05, 0.05, [[B.neck, 1]]), R(1.62, 0, 0.005, 0.048, 0.05, mixW(B.neck, B.head, 0.6))], SKIN, { seg: 10 });
   b.blob(M.Skin, V(0, 1.7, -0.008), V(0.092, 0.115, 0.104), SKIN, [[B.head, 1]], 16);
   b.blob(M.Skin, V(0, 1.645, -0.045), V(0.065, 0.05, 0.065), SKIN, [[B.head, 1]], 10); // jaw
+  if (look) face(b, look, SKIN);
 
   // ---- hood: open at the front, pointed at the back
   const hoodRings: Ring[] = [];
   const H = [[1.5, 0.13, 0.13, 0.02], [1.58, 0.135, 0.14, 0.015], [1.68, 0.13, 0.142, 0.012], [1.77, 0.11, 0.125, 0.02], [1.83, 0.07, 0.085, 0.045], [1.86, 0.02, 0.03, 0.09]];
   for (const [y, rx, rz, z] of H) hoodRings.push({ c: V(0, y, z), rx, rz, w: y < 1.55 ? [[B.neck, 0.5], [B.head, 0.5]] : [[B.head, 1]] });
   const HOOD_ARC: [number, number] = [Math.PI / 2 - Math.PI * 0.78, Math.PI / 2 + Math.PI * 0.78]; // open at the face (-z)
-  b.loft(M.Cloth, hoodRings, CLOAK, { seg: 16, arc: HOOD_ARC, uv: [3, 2] });
-  b.loft(M.Lining, hoodRings.map((r) => ({ ...r, rx: r.rx - 0.008, rz: r.rz - 0.008 })), HOOD_IN, { seg: 16, arc: HOOD_ARC });
+  if (!look || look.headwear === 1) {
+    b.loft(M.Cloth, hoodRings, CLOAK, { seg: 16, arc: HOOD_ARC, uv: [3, 2] });
+    b.loft(M.Lining, hoodRings.map((r) => ({ ...r, rx: r.rx - 0.008, rz: r.rz - 0.008 })), HOOD_IN, { seg: 16, arc: HOOD_ARC });
+  } else if (look.headwear === 2) {
+    b.loft(M.Leather, [R(1.74, 0, 0.0, 0.112, 0.122, [[B.head, 1]]), R(1.8, 0, 0.005, 0.1, 0.11, [[B.head, 1]]), R(1.84, 0, 0.01, 0.06, 0.07, [[B.head, 1]])], 0x5a3a22, { capEnd: true });
+  }
   // mantle over the shoulders
   b.loft(M.Cloth, [
     R(1.53, 0, 0.01, 0.12, 0.1, [[B.chest, 0.5], [B.neck, 0.5]]),
@@ -245,6 +254,48 @@ function buildBody(b: SkinBuilder) {
     R(0.38, 0, 0.12, 0.32, 0.21, [[B.cloak3, 1]])
   ];
   b.loft(M.Cloth, cloak, CLOAK, { seg: 18, arc: [Math.PI * 0.12, Math.PI * 0.88], jag: 0.09, uv: [3, 4] });
+}
+
+/** Face, hair, beard and race features for a created character. */
+function face(b: SkinBuilder, l: Look, skin: number) {
+  const H = [[B.head, 1]] as Weights;
+  const fem = l.gender === 'female';
+  const hair = HAIR_COLORS[l.hairColor];
+  const eyeR = 0.012 + l.eyeSize * 0.01;
+  const iris = l.race === 'vampire' ? 0xb01010 : l.race === 'darkelf' ? 0xd8a0ff : l.race === 'catfolk' || l.race === 'werewolf' ? 0xd8b030 : l.race === 'lizardfolk' ? 0xc8c040 : 0x3a5a6a;
+  for (const s of [-1, 1]) {
+    b.blob(M.Skin, V(s * 0.038, 1.715, -0.1), V(eyeR * 1.4, eyeR, eyeR * 0.6), 0xf0ece4, H, 8);
+    b.blob(M.Metal, V(s * 0.038, 1.715, -0.106), V(eyeR * 0.7, eyeR * 0.7, eyeR * 0.4), iris, H, 8);
+    const browY = 1.742 + l.brows * 0.006;
+    b.blob(M.Skin, V(s * 0.04, browY, -0.098), V(0.024, 0.005 + (fem ? 0 : l.brows * 0.004), 0.008), hair, H, 6);
+    // cheekbones
+    b.blob(M.Skin, V(s * 0.055, 1.69, -0.078), V(0.03 + l.cheeks * 0.01, 0.022, 0.025), skin, H, 8);
+  }
+  // nose and mouth
+  const ns = 0.7 + l.nose * 0.6;
+  b.blob(M.Skin, V(0, 1.695, -0.108), V(0.012 * ns, 0.026 * ns, 0.018 * ns), skin, H, 8);
+  const my = 1.655 + (l.mouth - 0.5) * 0.012;
+  b.blob(M.Skin, V(0, my, -0.1), V(0.024, 0.005, 0.008), fem ? 0xa85a5a : 0x9a6a5a, H, 8);
+  if (l.scars) b.blob(M.Skin, V(0.045, 1.7, -0.096), V(0.004, 0.03, 0.004), 0xe8c0b0, H, 4);
+  // ears
+  for (const s of [-1, 1]) {
+    if (l.race === 'darkelf' || l.race === 'vampire') { const e = V(s * 0.1, 1.73, 0.0); b.blob(M.Skin, e, V(0.012, 0.045, 0.02), skin, H, 6); b.blob(M.Skin, e.clone().add(V(s * 0.012, 0.035, 0.01)), V(0.008, 0.03, 0.012), skin, H, 6); }
+    else if (l.race === 'catfolk' || l.race === 'werewolf') { b.blob(M.Cloth, V(s * 0.065, 1.83, 0.0), V(0.03, 0.045, 0.015), l.race === 'werewolf' ? 0x5a4a3a : hair, H, 6); }
+    else b.blob(M.Skin, V(s * 0.095, 1.705, 0.005), V(0.012, 0.025, 0.018), skin, H, 6);
+  }
+  if (l.race === 'lizardfolk') {
+    b.blob(M.Skin, V(0, 1.66, -0.11), V(0.06, 0.045, 0.07), skin, H, 10); // snout
+    for (let i = 0; i < 4; i++) b.blob(M.Skin, V(0, 1.81 - i * 0.04, 0.03 + i * 0.03), V(0.012, 0.025, 0.02), 0x8a6a3a, H, 5); // crest
+  }
+  // hair
+  const hs = l.hairStyle;
+  if (hs > 0 && l.race !== 'lizardfolk') {
+    b.blob(M.Cloth, V(0, 1.74, 0.01), V(0.1, 0.088, 0.108), hair, H, 12);
+    if (hs >= 2) b.blob(M.Cloth, V(0, 1.63, 0.06), V(0.085, 0.13, 0.05), hair, [[B.head, 0.7], [B.neck, 0.3]], 10);
+    if (hs === 3) for (const s of [-1, 1]) b.blob(M.Cloth, V(s * 0.07, 1.55, 0.03), V(0.022, 0.09, 0.022), hair, [[B.neck, 1]], 6);
+    if (hs === 4) for (let i = 0; i < 6; i++) b.blob(M.Cloth, V(Math.sin(i) * 0.08, 1.79 + (i % 2) * 0.02, Math.cos(i) * 0.05), V(0.04, 0.05, 0.04), hair, H, 6);
+  }
+  if (l.beard && !fem) b.blob(M.Cloth, V(0, 1.62, -0.07), V(0.07, l.race === 'dwarf' ? 0.12 : 0.06, 0.05), hair, H, 10);
 }
 
 // ------------------------------------------------------------------ materials
@@ -347,6 +398,7 @@ export class HeroModel {
     this.held.position.set(0, -0.06, -0.01);
     this.handR.add(this.held);
     this.setHeld(null);
+    this.bones[BONES.hips].add(this.tail);
   }
 
   /** Show an item mesh in the right hand (null = the starting staff). */
@@ -374,6 +426,28 @@ export class HeroModel {
     this.shieldSlot.add(mesh, boss);
   }
   blocking = false;
+
+  /** Rebuild the body for a created character (null = the faceless Nameless One). */
+  setLook(look: Look | null) {
+    const builder = new SkinBuilder(6);
+    buildBody(builder, look);
+    const old = this.mesh.geometry;
+    this.mesh.geometry = builder.build();
+    old.dispose();
+    const race = look ? RACES.find((r) => r.id === look.race)! : null;
+    const h = race?.height ?? 1;
+    const fem = look?.gender === 'female';
+    this.root.scale.set(h * (fem ? 0.95 : 1) * (look?.race === 'barbarian' ? 1.05 : 1), h * (fem ? 0.96 : 1), h * (fem ? 0.95 : 1));
+    this.tail.visible = look?.race === 'catfolk' || look?.race === 'lizardfolk' || look?.race === 'werewolf';
+    (this.tail.material as THREE.MeshStandardMaterial).color.set(look?.race === 'lizardfolk' ? race!.skin[look.skin % 4] : look ? HAIR_COLORS[look.hairColor] : 0);
+    this.tail.scale.setScalar(look?.race === 'lizardfolk' ? 1.6 : 1);
+  }
+  private tail: THREE.Mesh = (() => {
+    const g = new THREE.CapsuleGeometry(0.035, 0.6, 3, 8); g.rotateX(1.1); g.translate(0, -0.12, 0.28);
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ roughness: 0.8 }));
+    m.visible = false;
+    return m;
+  })();
 
   private bone(n: BoneName) { return this.bones[BONES[n]]; }
   /** Smoothly rotate a bone toward a target euler (x, y, z). */

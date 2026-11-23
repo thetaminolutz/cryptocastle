@@ -44,8 +44,8 @@ export function eyes(b: GeoBuilder, x: number, y: number, z: number, r: number, 
   for (const s of [-1, 1]) add(b, ell(r, r, r * 0.6, s * x, y, z, 8), color, bone, pivot, 'white', glow);
 }
 
-interface Humanoid { h: number; w: number; skin: C3; cloth: C3; pants: C3; hood?: C3; eye: C3; eyeGlow?: number; hunch?: number; layer?: string; weapon?: 'dagger' | 'club' | 'sword' | 'spear' | 'none'; legs?: boolean }
-function humanoid(b: GeoBuilder, o: Humanoid) {
+export interface Humanoid { h: number; w: number; skin: C3; cloth: C3; pants: C3; hood?: C3; eye: C3; eyeGlow?: number; hunch?: number; layer?: string; weapon?: 'dagger' | 'club' | 'sword' | 'spear' | 'none'; legs?: boolean }
+export function humanoid(b: GeoBuilder, o: Humanoid) {
   const s = o.h / 1.8, w = o.w;
   const hipY = 0.92 * s, shY = 1.42 * s, headY = 1.62 * s + (o.hunch ? -o.hunch * 0.15 : 0);
   const headZ = -(o.hunch ?? 0) * 0.2;

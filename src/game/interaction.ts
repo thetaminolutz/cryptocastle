@@ -31,6 +31,7 @@ export interface InteractUI {
   openCrafting(): void;
   openChest(p: Piece): void;
   sleep(p: Piece): void;
+  special(p: Piece): void;
 }
 
 /** 3D model of a held item (tools, torch, food...). */
@@ -92,6 +93,8 @@ export class Interaction {
   private action: (() => void) | null = null;
   readonly group = new THREE.Group();
   combat: Combat | null = null;
+  /** herbalism: multiplier for plant harvests */
+  herbMul = 1;
   /** game-provided action that takes priority (e.g. recover your pack) */
   extra: (() => { label: string; run: () => void } | null) | null = null;
   creatures: Creatures | null = null;
@@ -340,6 +343,8 @@ export class Interaction {
         else if (use === 'bed') { label = 'Sleep'; this.action = () => this.ui.sleep(piece); }
         else if (use === 'chest') { label = 'Open chest'; this.action = () => this.ui.openChest(piece); }
         else if (use === 'sit') { label = this.player.sitting ? 'Stand up' : 'Sit'; this.action = () => { this.player.sitting = !this.player.sitting; if (this.player.sitting) { this.player.pos.set(piece.x, piece.y + 0.05, piece.z); this.player.yaw = piece.rot + Math.PI; } }; }
+        else if (use === 'tablet') { label = 'Read the tablet'; this.action = () => this.ui.special(piece); }
+        else if (use === 'rite') { label = 'Open the chest'; this.action = () => this.ui.special(piece); }
         else if (use === 'claim') { label = 'Boundary stone'; this.action = () => this.ui.toast(this.building.isSafe(this.player.pos) ? 'Your land is claimed and lit. Monsters will not spawn here.' : 'Your land is claimed. Light it (torch, lantern, fireplace) to keep monsters away.', '#c8b0ff'); }
       } else if (plant) {
         const d = PLANT_DROPS[plant.kind];
@@ -351,7 +356,7 @@ export class Interaction {
             if (this.world.isPlantRemoved(plant.key, plant.index)) return;
             this.world.removePlant(plant.key, plant.index);
             const sickle = this.tool()?.kind === 'sickle' || this.tool()?.kind === 'knife';
-            this.give(d.drops, sickle ? 1.6 : 1);
+            this.give(d.drops, (sickle ? 1.6 : 1) * this.herbMul);
             if (sickle) this.inv.wear(1);
           };
         };
