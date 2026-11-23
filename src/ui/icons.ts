@@ -120,6 +120,22 @@ function draw(c: CanvasRenderingContext2D, shape: IconShape, col: string, acc?: 
       c.fillStyle = 'rgba(200,230,240,0.5)'; c.beginPath(); c.arc(32, 38, 18, 0, 7); c.fill();
       c.fillStyle = col; c.beginPath(); c.arc(32, 40, 15, 0.1, Math.PI - 0.1); c.fill();
       break;
+    case 'sword':
+      handle(c, 12, 56, 22, 46, 6); c.fillStyle = '#5a4030'; c.fillRect(14, 40, 14, 4);
+      c.fillStyle = grad(20, 8, 56, 44); c.beginPath(); c.moveTo(22, 44); c.lineTo(52, 10); c.lineTo(56, 8); c.lineTo(54, 12); c.lineTo(26, 46); c.closePath(); c.fill();
+      break;
+    case 'spear': handle(c, 10, 58, 46, 14, 5); c.fillStyle = grad(40, 4, 58, 22); c.beginPath(); c.moveTo(44, 16); c.lineTo(58, 4); c.lineTo(50, 22); c.closePath(); c.fill(); break;
+    case 'mace': handle(c, 14, 56, 36, 26, 6); c.fillStyle = grad(30, 8, 56, 32); c.beginPath(); c.arc(42, 20, 11, 0, 7); c.fill(); c.fillStyle = shade(col, 1.4); for (let i = 0; i < 6; i++) { const a = i * 1.05; c.beginPath(); c.arc(42 + Math.cos(a) * 12, 20 + Math.sin(a) * 12, 3, 0, 7); c.fill(); } break;
+    case 'club': c.strokeStyle = grad(10, 50, 50, 10); c.lineWidth = 12; c.lineCap = 'round'; c.beginPath(); c.moveTo(16, 50); c.lineTo(46, 16); c.stroke(); handle(c, 10, 58, 20, 46, 6); break;
+    case 'shield':
+      c.fillStyle = grad(10, 6, 54, 58); c.beginPath(); c.moveTo(10, 10); c.lineTo(54, 10); c.lineTo(52, 34); c.quadraticCurveTo(46, 52, 32, 58); c.quadraticCurveTo(18, 52, 12, 34); c.closePath(); c.fill();
+      c.strokeStyle = shade(col, 0.55); c.lineWidth = 3; c.stroke(); c.fillStyle = '#c8a040'; c.beginPath(); c.arc(32, 30, 5, 0, 7); c.fill();
+      break;
+    case 'meat': c.fillStyle = grad(8, 14, 50, 50); c.beginPath(); c.ellipse(28, 34, 20, 15, -0.4, 0, 7); c.fill(); c.fillStyle = '#e8e0cc'; c.fillRect(42, 14, 6, 18); c.beginPath(); c.arc(45, 12, 5, 0, 7); c.fill(); break;
+    case 'hide': c.fillStyle = grad(8, 10, 56, 54); c.beginPath(); c.moveTo(12, 14); c.quadraticCurveTo(32, 20, 52, 14); c.lineTo(48, 32); c.lineTo(56, 52); c.quadraticCurveTo(32, 44, 8, 52); c.lineTo(16, 32); c.closePath(); c.fill(); break;
+    case 'bone': c.strokeStyle = col; c.lineWidth = 7; c.lineCap = 'round'; c.beginPath(); c.moveTo(16, 48); c.lineTo(48, 16); c.stroke(); c.fillStyle = col; for (const [x, y] of [[12, 46], [18, 52], [46, 12], [52, 18]]) { c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); } break;
+    case 'fang': c.fillStyle = grad(20, 8, 44, 58); c.beginPath(); c.moveTo(22, 10); c.quadraticCurveTo(46, 10, 42, 22); c.quadraticCurveTo(38, 44, 30, 58); c.quadraticCurveTo(26, 34, 22, 10); c.fill(); break;
+    case 'coin': c.fillStyle = grad(14, 14, 50, 50); c.beginPath(); c.arc(32, 32, 18, 0, 7); c.fill(); c.strokeStyle = shade(col, 0.6); c.lineWidth = 2; c.beginPath(); c.arc(32, 32, 13, 0, 7); c.stroke(); break;
     case 'brick':
       c.fillStyle = grad(8, 20, 56, 46); c.fillRect(8, 22, 48, 24);
       c.strokeStyle = shade(col, 0.6); c.lineWidth = 2; c.strokeRect(8, 22, 48, 24);

@@ -7,8 +7,10 @@ export const RARITY_COLOR: Record<Rarity, string> = {
   common: '#b8b0a0', fine: '#5fbf5a', rare: '#4f8fe8', epic: '#a65ee0', legendary: '#e8b030', cursed: '#e0343c'
 };
 
-export type ToolKind = 'pickaxe' | 'axe' | 'shovel' | 'sickle' | 'knife' | 'staff' | 'torch';
-export type Category = 'material' | 'tool' | 'food' | 'placeable' | 'misc';
+export type ToolKind = 'pickaxe' | 'axe' | 'shovel' | 'sickle' | 'knife' | 'staff' | 'torch' | 'sword' | 'spear' | 'mace' | 'club';
+export type DmgType = 'slash' | 'pierce' | 'blunt' | 'fire' | 'ice' | 'poison' | 'holy' | 'shadow';
+export interface WeaponStats { dmg: number; type: DmgType; reach: number; speed: number; stamina: number; }
+export type Category = 'material' | 'tool' | 'food' | 'placeable' | 'misc' | 'weapon' | 'shield';
 export type Station = 'hand' | 'workbench' | 'campfire' | 'furnace' | 'anvil';
 
 export interface ItemDef {
@@ -16,13 +18,15 @@ export interface ItemDef {
   desc: string;
   icon: { shape: IconShape; color: string; accent?: string };
   tool?: { kind: ToolKind; tier: number; power: number; durability: number; speed: number };
-  food?: { heal: number; stamina?: number };
+  food?: { heal: number; stamina?: number; cures?: string };
+  weapon?: WeaponStats;
+  shield?: { block: number };
   place?: string; // placeable prop id
   value?: number; // base price (economy, M8)
 }
 export type IconShape = 'log' | 'plank' | 'stick' | 'stone' | 'ore' | 'bar' | 'gem' | 'fiber' | 'rope' | 'berry' | 'mushroom' | 'flower'
   | 'leaf' | 'pickaxe' | 'axe' | 'shovel' | 'sickle' | 'knife' | 'staff' | 'torch' | 'campfire' | 'bench' | 'furnace' | 'anvil'
-  | 'sand' | 'clump' | 'meal' | 'potion' | 'glass' | 'brick' | 'coal' | 'shard' | 'flint';
+  | 'sand' | 'clump' | 'meal' | 'potion' | 'glass' | 'brick' | 'coal' | 'shard' | 'flint' | 'sword' | 'spear' | 'mace' | 'club' | 'shield' | 'meat' | 'hide' | 'bone' | 'fang' | 'coin';
 
 const I = (d: ItemDef) => d;
 export const ITEMS: Record<string, ItemDef> = {};
@@ -97,6 +101,36 @@ add(
   I({ id: 'staff', name: 'Gnarled Staff', cat: 'tool', stack: 1, desc: 'Your only companion since the clearing.', icon: { shape: 'staff', color: '#6a4a2e' }, tool: { kind: 'staff', tier: 0, power: 0.6, durability: 0, speed: 1 }, value: 1 }),
   I({ id: 'torch', name: 'Torch', cat: 'tool', stack: 20, desc: 'Light in the dark. Hold it to see.', icon: { shape: 'torch', color: '#8a6a42', accent: '#ffb040' }, tool: { kind: 'torch', tier: 0, power: 0.3, durability: 0, speed: 1 }, value: 2 })
 );
+// ---- weapons & shields
+const W = (dmg: number, type: DmgType, reach: number, speed: number, stamina: number): WeaponStats => ({ dmg, type, reach, speed, stamina });
+add(
+  I({ id: 'club', name: 'Wooden Club', cat: 'weapon', stack: 1, desc: 'A heavy knot of oak. Crude, but it works.', icon: { shape: 'club', color: '#7a5a3a' }, weapon: W(9, 'blunt', 2.0, 0.9, 7), tool: { kind: 'club', tier: 0, power: 0.4, durability: 120, speed: 0.9 }, value: 3 }),
+  I({ id: 'flint_spear', name: 'Flint Spear', cat: 'weapon', stack: 1, desc: 'Keeps danger at arm’s length — and then some.', icon: { shape: 'spear', color: '#5a5a62' }, weapon: W(10, 'pierce', 2.8, 1.0, 6), tool: { kind: 'spear', tier: 0, power: 0.3, durability: 140, speed: 1 }, value: 6 }),
+  I({ id: 'rusty_sword', name: 'Rusty Sword', cat: 'weapon', stack: 1, desc: 'Pitted and notched, taken from someone who no longer needs it.', icon: { shape: 'sword', color: '#9a7a62' }, weapon: W(13, 'slash', 2.3, 1.1, 6), tool: { kind: 'sword', tier: 0, power: 0.3, durability: 160, speed: 1.1 }, value: 12 }),
+  I({ id: 'iron_sword', name: 'Iron Sword', cat: 'weapon', stack: 1, rarity: 'fine', desc: 'Balanced, honest steel.', icon: { shape: 'sword', color: '#b8b8c0' }, weapon: W(20, 'slash', 2.4, 1.15, 6), tool: { kind: 'sword', tier: 0, power: 0.3, durability: 400, speed: 1.15 }, value: 45 }),
+  I({ id: 'iron_mace', name: 'Iron Mace', cat: 'weapon', stack: 1, rarity: 'fine', desc: 'Bones were not meant to meet this.', icon: { shape: 'mace', color: '#8a8a92' }, weapon: W(24, 'blunt', 2.1, 0.85, 9), tool: { kind: 'mace', tier: 0, power: 0.5, durability: 450, speed: 0.85 }, value: 50 }),
+  I({ id: 'silver_sword', name: 'Silver Sword', cat: 'weapon', stack: 1, rarity: 'rare', desc: 'The restless dead fear its gleam.', icon: { shape: 'sword', color: '#e0e8f0' }, weapon: W(24, 'holy', 2.4, 1.2, 6), tool: { kind: 'sword', tier: 0, power: 0.3, durability: 380, speed: 1.2 }, value: 90 }),
+  I({ id: 'wooden_shield', name: 'Wooden Shield', cat: 'shield', stack: 1, desc: 'Keep it on your belt to raise it when you block.', icon: { shape: 'shield', color: '#8a6a42' }, shield: { block: 0.75 }, value: 6 }),
+  I({ id: 'iron_shield', name: 'Iron Shield', cat: 'shield', stack: 1, rarity: 'fine', desc: 'A heater shield rimmed with iron.', icon: { shape: 'shield', color: '#a0a0a8' }, shield: { block: 0.88 }, value: 40 })
+);
+// ---- creature loot & remedies
+add(
+  I({ id: 'raw_meat', name: 'Raw Meat', cat: 'food', desc: 'Cook it first if you value your stomach.', icon: { shape: 'meat', color: '#b03a3a' }, food: { heal: 2 }, value: 2 }),
+  I({ id: 'cooked_meat', name: 'Roast Meat', cat: 'food', desc: 'Hot, greasy and wonderful.', icon: { shape: 'meat', color: '#8a4a22' }, food: { heal: 24, stamina: 20 }, value: 6 }),
+  I({ id: 'hide', name: 'Hide', cat: 'material', desc: 'Raw animal skin. Tan it into leather.', icon: { shape: 'hide', color: '#8a6a4a' }, value: 3 }),
+  I({ id: 'leather', name: 'Leather', cat: 'material', desc: 'Supple and strong.', icon: { shape: 'hide', color: '#6a4a2a' }, value: 6 }),
+  I({ id: 'bone', name: 'Bone', cat: 'material', desc: 'Clean and white.', icon: { shape: 'bone', color: '#e8e0cc' }, value: 1 }),
+  I({ id: 'fang', name: 'Fang', cat: 'material', desc: 'Still sharp.', icon: { shape: 'fang', color: '#f0ead8' }, value: 3 }),
+  I({ id: 'chitin', name: 'Chitin', cat: 'material', desc: 'A plate of spider shell.', icon: { shape: 'shard', color: '#3a3a2a' }, value: 4 }),
+  I({ id: 'venom_sac', name: 'Venom Sac', cat: 'material', rarity: 'fine', desc: 'Handle with great care.', icon: { shape: 'potion', color: '#6ac03a' }, value: 8 }),
+  I({ id: 'troll_hide', name: 'Troll Hide', cat: 'material', rarity: 'rare', desc: 'Thick as a door.', icon: { shape: 'hide', color: '#5a6a4a' }, value: 30 }),
+  I({ id: 'ectoplasm', name: 'Ectoplasm', cat: 'material', rarity: 'fine', desc: 'Cold, faintly glowing residue of the dead.', icon: { shape: 'potion', color: '#b0e0ff' }, value: 14 }),
+  I({ id: 'ember_core', name: 'Ember Core', cat: 'material', rarity: 'fine', desc: 'Still burns in your hand.', icon: { shape: 'gem', color: '#ff7a2a' }, value: 16 }),
+  I({ id: 'toad_slime', name: 'Toad Slime', cat: 'material', desc: 'Foul-smelling. Alchemists want it anyway.', icon: { shape: 'potion', color: '#7a9a3a' }, value: 2 }),
+  I({ id: 'bandage', name: 'Bandage', cat: 'food', desc: 'Stops bleeding and closes small wounds.', icon: { shape: 'rope', color: '#e8e0d0' }, food: { heal: 8, cures: 'bleed' }, value: 3 }),
+  I({ id: 'antidote', name: 'Antidote', cat: 'food', rarity: 'fine', desc: 'Bitter. Draws poison from the blood.', icon: { shape: 'potion', color: '#a0e050' }, food: { heal: 5, cures: 'poison' }, value: 10 })
+);
+
 // ---- placeable stations
 add(
   I({ id: 'workbench', name: 'Workbench', cat: 'placeable', stack: 5, desc: 'Craft tools and furniture here.', icon: { shape: 'bench', color: '#a07a4a' }, place: 'workbench', value: 10 }),
@@ -136,6 +170,17 @@ export const RECIPES: Recipe[] = [
   R('iron_pickaxe', 1, 'anvil', ['iron_bar', 3], ['stick', 2]), R('iron_axe', 1, 'anvil', ['iron_bar', 3], ['stick', 2]), R('iron_shovel', 1, 'anvil', ['iron_bar', 1], ['stick', 2]),
   R('mithril_pickaxe', 1, 'anvil', ['mithril_bar', 3], ['iron_bar', 1], ['stick', 2]), R('mithril_axe', 1, 'anvil', ['mithril_bar', 3], ['iron_bar', 1], ['stick', 2]), R('mithril_shovel', 1, 'anvil', ['mithril_bar', 1], ['stick', 2]),
   R('roast_mushroom', 1, 'campfire', ['mushroom', 1]),
+  R('cooked_meat', 1, 'campfire', ['raw_meat', 1]),
+  R('club', 1, 'hand', ['log', 1]),
+  R('flint_spear', 1, 'hand', ['stick', 2], ['flint', 1], ['rope', 1]),
+  R('bandage', 2, 'hand', ['fiber', 3], ['fern', 1]),
+  R('antidote', 1, 'campfire', ['glowcap', 1], ['berries', 2]),
+  R('leather', 1, 'workbench', ['hide', 2]),
+  R('wooden_shield', 1, 'workbench', ['planks', 4], ['leather', 1]),
+  R('iron_sword', 1, 'anvil', ['iron_bar', 3], ['leather', 1]),
+  R('iron_mace', 1, 'anvil', ['iron_bar', 4], ['stick', 1]),
+  R('iron_shield', 1, 'anvil', ['iron_bar', 3], ['planks', 2], ['leather', 1]),
+  R('silver_sword', 1, 'anvil', ['silver_bar', 3], ['iron_bar', 1], ['leather', 1]),
   R('berry_mash', 1, 'campfire', ['berries', 3])
 ];
 // copper tools can also be made at a workbench before you own an anvil
@@ -193,3 +238,18 @@ export const PLANT_DROPS: Record<number, { verb: string; drops: [string, number,
 };
 
 export const item = (id: string) => ITEMS[id];
+
+/** Melee stats of whatever is held (bare hands if nothing / non-weapon). */
+export function weaponOf(id: string | null | undefined): WeaponStats {
+  const d = id ? ITEMS[id] : undefined;
+  if (d?.weapon) return d.weapon;
+  const k = d?.tool?.kind, tier = d?.tool?.tier ?? 0;
+  if (k === 'axe') return W(6 + tier * 3, 'slash', 2.1, 0.95, 7);
+  if (k === 'pickaxe') return W(5 + tier * 2.5, 'pierce', 2.1, 0.9, 7);
+  if (k === 'shovel') return W(4 + tier * 2, 'blunt', 2.1, 0.9, 6);
+  if (k === 'knife') return W(6, 'pierce', 1.6, 1.4, 4);
+  if (k === 'sickle') return W(6, 'slash', 1.8, 1.25, 5);
+  if (k === 'staff') return W(6, 'blunt', 2.4, 1.05, 5);
+  if (k === 'torch') return W(4, 'fire', 1.8, 1.1, 5);
+  return W(3, 'blunt', 1.6, 1.3, 4);
+}

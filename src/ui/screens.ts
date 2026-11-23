@@ -77,3 +77,36 @@ export async function showSlots(onPlay: (slot: number, data: SaveData | null) =>
   s.style.overflowY = 'auto';
   ui().appendChild(s);
 }
+
+/** Choose the rule of the journey: Wanderer (normal) or One Life (permanent death). */
+export function showModeSelect(onPick: (mode: 'wanderer' | 'onelife') => void, onBack: () => void) {
+  const s = document.createElement('div');
+  s.className = 'screen';
+  const t = document.createElement('div'); t.className = 'title-sub'; t.textContent = 'THE RULE OF YOUR JOURNEY';
+  const row = document.createElement('div'); row.className = 'row';
+  const card = (title: string, text: string, color: string, fn: () => void) => {
+    const c = document.createElement('div'); c.className = 'mode-card';
+    const h = document.createElement('h3'); h.textContent = title; h.style.color = color;
+    const p = document.createElement('p'); p.textContent = text;
+    c.append(h, p, button('Choose', true, fn));
+    row.appendChild(c);
+  };
+  card('WANDERER', 'When you fall, you wake at your bed or the last safe place. You lose some gold, and your pack stays where you died — go back and recover it.', '#d8a93a', () => { s.remove(); onPick('wanderer'); });
+  card('ONE LIFE', 'You only get one chance. If this character dies, they are gone forever, and a gravestone in the Cemetery of the Fallen will remember how.', '#e0242e', () => {
+    if (!confirm('One Life: when you die, this character and save are gone for good. Are you sure?')) return;
+    if (!confirm('Truly? There is no turning back.')) return;
+    s.remove(); onPick('onelife');
+  });
+  s.append(t, row, button('Back', false, () => { s.remove(); onBack(); }));
+  ui().appendChild(s);
+}
+
+/** Full-screen death message. */
+export function showDeath(title: string, text: string, buttonLabel: string, onOk: () => void) {
+  const d = document.createElement('div');
+  d.className = 'death';
+  const h = document.createElement('h1'); h.textContent = title;
+  const p = document.createElement('p'); p.textContent = text;
+  d.append(h, p, button(buttonLabel, true, () => { d.remove(); onOk(); }));
+  ui().appendChild(d);
+}

@@ -317,6 +317,9 @@ export class HeroModel {
   /** 0..1 bending down to harvest */
   harvest = 0;
   readonly handR: THREE.Bone;
+  readonly handL: THREE.Bone;
+  private shieldSlot = new THREE.Group();
+  private shieldId: string | null = null;
   readonly held = new THREE.Group();
   private staff = buildStaff();
 
@@ -337,6 +340,9 @@ export class HeroModel {
     this.mesh.frustumCulled = false;
     this.root.add(this.mesh);
     this.handR = this.bones[BONES.handR];
+    this.handL = this.bones[BONES.handL];
+    this.shieldSlot.position.set(-0.05, 0.08, -0.02);
+    this.bones[BONES.forearmL].add(this.shieldSlot);
     // held item sits in the right hand, pointing forward/up
     this.held.position.set(0, -0.06, -0.01);
     this.handR.add(this.held);
@@ -350,6 +356,24 @@ export class HeroModel {
     if (!obj) { o.rotation.set(0.12, 0, 0); o.position.set(0, -0.32, -0.02); }
     this.held.add(o);
   }
+
+  /** Show a shield on the left forearm (by item id), or none. */
+  setShield(id: string | null, color = 0x8a6a42) {
+    if (id === this.shieldId) return;
+    this.shieldId = id;
+    this.shieldSlot.clear();
+    if (!id) return;
+    const metal = id.includes('iron');
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.2, 0.24); shape.lineTo(0.2, 0.24); shape.lineTo(0.19, -0.02); shape.quadraticCurveTo(0.14, -0.22, 0, -0.3); shape.quadraticCurveTo(-0.14, -0.22, -0.19, -0.02); shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.04, bevelEnabled: true, bevelSize: 0.015, bevelThickness: 0.015, bevelSegments: 1 });
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: metal ? 0x9a9aa2 : color, roughness: metal ? 0.4 : 0.8, metalness: metal ? 0.8 : 0 }));
+    mesh.rotation.y = -Math.PI / 2; mesh.position.set(-0.07, -0.12, 0);
+    const boss = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 6), new THREE.MeshStandardMaterial({ color: 0xc8a040, roughness: 0.35, metalness: 0.9 }));
+    boss.position.set(-0.13, -0.1, 0);
+    this.shieldSlot.add(mesh, boss);
+  }
+  blocking = false;
 
   private bone(n: BoneName) { return this.bones[BONES[n]]; }
   /** Smoothly rotate a bone toward a target euler (x, y, z). */
@@ -430,6 +454,8 @@ export class HeroModel {
       armRx = 0.3 + up * 2.6 - strike * 0.4; armRz = 0.25; foreR = 0.3 + up * 0.8;
       chestY = -0.35 * up + 0.25 * strike; chestX += strike * 0.25;
     }
+    // blocking: raise the shield arm across the body
+    if (this.blocking) { armLx = 1.25; armLz = 0.35; foreL = 1.3; spineX += 0.08; }
     // harvesting: bend down and reach
     if (this.harvest > 0) {
       const h = this.harvest;

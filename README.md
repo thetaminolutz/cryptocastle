@@ -16,7 +16,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M4 Biomes, plants, animals, caves, ores, weather + realistic graphics overhaul | ✅ done |
 | M5 Gathering, inventory, hotbar, crafting, tools, saving + skinned hero character | ✅ done |
 | M6 Building mode, furniture, chests, beds, land claims, blueprints | ✅ done |
-| M7 Combat, first 10 enemies, loot, death/respawn, game modes | next |
+| M7 Combat, first 10 enemies, loot, death/respawn, game modes | ✅ done |
+| M8 Villages, NPCs with schedules, dialogue, shops, reputation | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -63,8 +64,23 @@ Remove (full refund), Undo (20 steps). **Plans:** lay out a hut, cottage or
 longhouse as a blueprint, then tap "Build plans" to raise every piece you have
 materials for. A lit, claimed plot keeps predators (and later monsters) away.
 
+**Combat (M7):** tap STRIKE for light attacks (tap again mid-swing for a 3-hit
+combo), hold it during the wind-up for a charged heavy blow; hold BLOCK to block
+(a shield on your belt blocks more), and block just before a hit lands to
+**parry** and stun the attacker; dodge rolls avoid damage. Tap an enemy to lock
+on. Damage types (slash, pierce, blunt, fire, ice, poison, holy, shadow) meet
+weaknesses and resistances; status effects: bleeding, poison, burning, frozen,
+stunned, cursed (bandages and antidotes cure them). Enemies: Toadlings (ambush
+from the undergrowth), Giant Rats, Cave Spiders, Grave Robbers, Bandits, Skeleton
+Warriors, Kobolds, Trolls, Restless Ghosts, Fire Imps — they telegraph attacks,
+flank, flee when weak and call for help; rare elites have blazing eyes. Wolves,
+boars and bears fight back; every animal can be hunted. Loot bodies with USE.
+XP and levels ("You're a Two now."). **Modes:** Wanderer (wake at your bed, lose
+some gold, your pack waits where you fell) or One Life (death is permanent; a
+grave is kept for the Cemetery of the Fallen).
+
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
-drag on the right = camera, **Strike/Mine/Chop/Dig** (hold to keep swinging),
+drag on the right = camera (tap an enemy to lock on), **Strike/Mine/Chop/Dig** (hold to keep swinging), **Block**,
 **Use** (appears when something is in reach: harvest, place, drink, use station),
 **Jump** (hold against a wall or tree to climb; in water: swim up), **Dodge** = roll.
 Tap a belt slot to hold it. ◐ toggles first/third person, ☰ opens the menu
@@ -134,6 +150,8 @@ scripts/     icon generator (pixel-art PNGs, run automatically on build)
   a case in `biomeHeight()` in `src/world/terrain.ts`.
 - **A new tree or plant:** add a model in `buildTree()` / `buildPlant()` in
   `src/world/vegetation.ts` and list it in a biome's `trees` / `plants`.
+- **A new enemy:** add a row (stats, loot, biomes, model) to `ENEMIES` in
+  `src/data/enemies.ts`.
 - **A new building piece:** add a row to `PIECES` in `src/data/pieces.ts` and a
   model in `MODELS` in `src/world/building.ts`. Blueprints live in `BLUEPRINTS`.
 - **A new texture:** add a painter to `PAINTERS` in `src/world/textures.ts`.

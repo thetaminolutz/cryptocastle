@@ -345,6 +345,7 @@ out vec3 vColor;
 flat out vec3 vLayerTint;
 out float vAo;
 out float vVar;
+out float vFlash;
 
 mat2 rot2(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 
@@ -363,6 +364,7 @@ void main() {
     else if (bone == 6) { ang = sin(ph * 2.0) * (0.25 + mv * 0.4); axis = 1; }
     else if (bone == 7) { ang = sin(ph * 2.2) * 0.9 * sp; axis = 2; }
     else if (bone == 8) { ang = -sin(ph * 2.2) * 0.9 * sp; axis = 2; }
+    else if (bone == 9) { ang = sin(ph + 3.14159) * 0.6 * mv + aAnim.w * 2.4; } // weapon arm: walk swing + attack
     if (ang != 0.0) {
       vec3 q = p - piv;
       if (axis == 0) { q.yz = rot2(ang) * q.yz; nrm.yz = rot2(ang) * nrm.yz; }
@@ -373,6 +375,12 @@ void main() {
   #endif
   float scale = aInst2.x;
   vec3 base = aInst.xyz;
+  #ifdef ANIMAL
+    // death: topple over sideways
+    float tilt = aInst2.z;
+    if (tilt != 0.0) { p.xy = rot2(tilt) * p.xy; nrm.xy = rot2(tilt) * nrm.xy; }
+    vFlash = aInst2.w;
+  #endif
   #ifdef PLANT
     // shrink plants away near the edge of the vegetation radius
     float dist = length(base.xz - cameraPosition.xz);
@@ -396,6 +404,9 @@ void main() {
   vVar = aInst2.y;
   vec3 c = aColor;
   int tm = int(mod(aLayerTint.y + 0.5, 10.0));
+  #ifndef ANIMAL
+  vFlash = 0.0;
+  #endif
   if (tm == 1) c *= uBiomeTint[int(aInst2.z + 0.5)] * mix(0.8, 1.15, aInst2.y);
   else if (tm == 2) {
     int k = int(aInst2.y * 5.0);
@@ -419,6 +430,7 @@ in vec3 vColor;
 flat in vec3 vLayerTint;
 in float vAo;
 in float vVar;
+in float vFlash;
 void main() {
   vec4 tex = texture(uAlbedo, vec3(vUv, vLayerTint.x));
   bool foliage = vLayerTint.y > 9.5;
@@ -452,7 +464,11 @@ void main() {
     col += albedo * uLightColor * pow(max(dot(-V, uLightDir), 0.0), 4.0) * 0.6 * shadow;
   }
   col += albedo * pointLights(vWorld, n) * vAo;
+  col = mix(col, vec3(2.5, 0.25, 0.15), clamp(vFlash, 0.0, 1.0) * 0.6); // hit flash
   col += albedo * vLayerTint.z * (1.0 + uNight * 2.0);
+  #ifdef ANIMAL
+  if (vVar > 0.99) col += albedo * vLayerTint.z * 10.0; // elite: blazing eyes
+  #endif
   gl_FragColor = vec4(applyFog(col, vWorld), outA);
   #ifdef GHOST
     gl_FragColor = vec4(mix(col, uGhost.rgb, 0.6), uGhost.a);

@@ -26,6 +26,35 @@ class AudioEngine {
   suspend() { if (this.ctx && this.ctx.state === 'running') void this.ctx.suspend(); }
   resume() { if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume(); }
 
+  private noise(len: number, freq: number, type: BiquadFilterType, gain: number, q = 1, sweep?: number) {
+    const ctx = this.ctx, out = this.master;
+    if (!ctx || !out) return;
+    const buf = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * len)), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = ctx.createGain(); const t = ctx.currentTime;
+    if (sweep) f.frequency.exponentialRampToValueAtTime(sweep, t + len);
+    g.gain.setValueAtTime(gain * settings.values.sfxVolume, t); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    src.connect(f).connect(g).connect(out); src.start(t);
+  }
+  private tone(freq: number, len: number, type: OscillatorType, gain: number, slide?: number) {
+    const ctx = this.ctx, out = this.master;
+    if (!ctx || !out) return;
+    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + len);
+    g.gain.setValueAtTime(gain * settings.values.sfxVolume, t); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(g).connect(out); o.start(t); o.stop(t + len + 0.02);
+  }
+  whoosh() { this.noise(0.18, 900, 'bandpass', 0.25, 1.2, 2400); }
+  impact(heavy = false) { this.noise(heavy ? 0.25 : 0.14, heavy ? 300 : 600, 'lowpass', heavy ? 0.9 : 0.6); this.tone(heavy ? 90 : 140, 0.12, 'sine', 0.5, 50); }
+  block() { this.tone(820, 0.18, 'triangle', 0.35, 600); this.noise(0.1, 2500, 'highpass', 0.25); }
+  parry() { this.tone(1400, 0.35, 'triangle', 0.4, 1800); this.tone(2100, 0.25, 'sine', 0.2); }
+  /** sharp warning sound when the player is hit */
+  hurt() { this.tone(980, 0.16, 'square', 0.22, 420); this.noise(0.12, 400, 'lowpass', 0.5); }
+
   /** Distant rolling thunder (filtered noise). */
   thunder() {
     const ctx = this.ctx, out = this.master;

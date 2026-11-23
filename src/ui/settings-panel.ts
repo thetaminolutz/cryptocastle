@@ -15,6 +15,8 @@ const ROWS: Row[] = [
   { kind: 'select', key: 'vegetation', label: 'Grass & plants', options: [['0', 'Low'], ['1', 'Medium'], ['2', 'High']] },
   { kind: 'range', key: 'particles', label: 'Weather particles', min: 0, max: 1, step: 0.1 },
   { kind: 'toggle', key: 'pixelLook', label: 'Retro pixel look' },
+  { kind: 'toggle', key: 'damageNumbers', label: 'Damage numbers' },
+  { kind: 'toggle', key: 'hitSound', label: 'Warning sound when hit' },
   { kind: 'select', key: 'fpsCap', label: 'FPS cap', options: [['60', '60'], ['30', '30']] },
   { kind: 'toggle', key: 'autoQuality', label: 'Auto quality (heat / FPS)' },
   { kind: 'toggle', key: 'showFps', label: 'Show FPS counter' },
@@ -67,7 +69,10 @@ export function buildSettings(panel: HTMLElement) {
       const btn = document.createElement('button');
       btn.className = 'btn';
       btn.style.minWidth = '110px'; btn.style.minHeight = '48px'; btn.style.fontSize = '16px';
-      btn.addEventListener('click', () => { settings.set(row.key, !v[row.key] as never); refreshers.forEach((f) => f()); });
+      btn.addEventListener('click', () => {
+        if (row.key === 'hitSound' && v.hitSound && !confirm('Without the warning sound you may not notice when you are attacked. This is dangerous. Turn it off anyway?')) return;
+        settings.set(row.key, !v[row.key] as never); refreshers.forEach((f) => f());
+      });
       refreshers.push(() => { btn.textContent = v[row.key] ? 'On' : 'Off'; });
       r.appendChild(btn);
     }

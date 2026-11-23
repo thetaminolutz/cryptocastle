@@ -13,7 +13,9 @@ export class TouchControls {
   private knob: HTMLDivElement;
   private joyId: number | null = null;
   private joyOrigin = { x: 0, y: 0 };
-  private lookIds = new Map<number, { x: number; y: number }>();
+  private lookIds = new Map<number, { x: number; y: number; sx: number; sy: number; t: number }>();
+  /** a short tap on the camera side of the screen (e.g. to pick a target) */
+  onTap: ((x: number, y: number) => void) | null = null;
   private buttons: HTMLDivElement[] = [];
   private byName = new Map<ButtonName, HTMLDivElement>();
   private labels = new Map<ButtonName, string>();
@@ -83,7 +85,7 @@ export class TouchControls {
       Object.assign(this.knob.style, { display: 'block', width: `${r}px`, height: `${r}px` });
       this.placeKnob(e.clientX, e.clientY);
     } else {
-      this.lookIds.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      this.lookIds.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now() });
     }
   }
 
@@ -116,6 +118,8 @@ export class TouchControls {
       this.knob.style.display = 'none';
       input.setTouchMove(0, 0, false);
     }
+    const l = this.lookIds.get(e.pointerId);
+    if (l && e.type === 'pointerup' && performance.now() - l.t < 300 && Math.hypot(e.clientX - l.sx, e.clientY - l.sy) < 12) this.onTap?.(e.clientX, e.clientY);
     this.lookIds.delete(e.pointerId);
   }
 }

@@ -22,25 +22,35 @@ export interface SaveData {
   world: WorldDelta;
   props: PlacedProp[];
   building?: BuildSave;
+  stats?: { gold: number; xp: number; level: number; maxLife: number; kills: Record<string, number> };
+  lostPack?: { x: number; y: number; z: number; items: (Stack | null)[] } | null;
 }
+
+/** A fallen One-Life character, remembered in the Cemetery of the Fallen. */
+export interface Grave { id?: number; name: string; cause: string; day: number; level: number; date: number; seed: number; }
 
 const DB = 'duskmere';
 const STORE = 'saves';
+const GRAVES = 'graves';
 
 function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB, 1);
-    req.onupgradeneeded = () => { req.result.createObjectStore(STORE, { keyPath: 'slot' }); };
+    const req = indexedDB.open(DB, 2);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'slot' });
+      if (!db.objectStoreNames.contains(GRAVES)) db.createObjectStore(GRAVES, { keyPath: 'id', autoIncrement: true });
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
-async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>, store = STORE): Promise<T> {
   const db = await open();
   return new Promise((resolve, reject) => {
-    const t = db.transaction(STORE, mode);
-    const req = fn(t.objectStore(STORE));
+    const t = db.transaction(store, mode);
+    const req = fn(t.objectStore(store));
     t.oncomplete = () => { resolve(req.result); db.close(); };
     t.onerror = () => { reject(t.error); db.close(); };
   });
@@ -51,6 +61,8 @@ export function migrate(d: SaveData): SaveData {
   if (!d.version) d.version = 1;
   d.props ??= [];
   d.building ??= { pieces: [], respawn: null };
+  d.stats ??= { gold: 0, xp: 0, level: 1, maxLife: 100, kills: {} };
+  d.mode ??= 'wanderer';
   d.world ??= { edits: [], trees: [], plants: [] };
   return d;
 }
@@ -68,6 +80,8 @@ export const saves = {
   },
   async write(d: SaveData): Promise<void> { d.updated = Date.now(); await tx('readwrite', (s) => s.put(d)); },
   async remove(slot: number): Promise<void> { await tx('readwrite', (s) => s.delete(slot)); },
+  async addGrave(g: Grave): Promise<void> { await tx('readwrite', (s) => s.add(g), GRAVES); },
+  async graves(): Promise<Grave[]> { try { return await tx<Grave[]>('readonly', (s) => s.getAll() as IDBRequest<Grave[]>, GRAVES); } catch { return []; } },
 
   exportFile(d: SaveData) {
     const blob = new Blob([JSON.stringify(d)], { type: 'application/json' });

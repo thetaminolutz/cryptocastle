@@ -28,7 +28,12 @@ export class Player {
   /** Body facing (radians, same convention as camera yaw). */
   yaw = 0;
   state: PlayerState = 'air';
+  maxLife = PLAYER_TUNING.lifeMax;
   life = PLAYER_TUNING.lifeMax;
+  /** combat state (set by the combat system) */
+  blocking = false;
+  stunT = 0;
+  slow = 1;
   stamina = PLAYER_TUNING.staminaMax;
   breath = PLAYER_TUNING.breathMax;
   exhausted = false;   // stamina ran out: no sprint until it recovers a bit
@@ -47,6 +52,8 @@ export class Player {
   private sinceDamage = 10;
   private coyote = 0;
   private rollTime = 0;
+  /** dodge rolls avoid damage during their first part */
+  get invulnerable() { return this.state === 'roll' && this.rollTime > PLAYER_TUNING.rollTime - 0.32; }
   private rollDir = new THREE.Vector3();
   private wallContact = false;
   private trunkContact = false;
@@ -61,7 +68,7 @@ export class Player {
   spawn(x: number, y: number, z: number) {
     this.pos.set(x, y, z);
     this.vel.set(0, 0, 0);
-    this.life = PLAYER_TUNING.lifeMax;
+    this.life = this.maxLife;
     this.stamina = PLAYER_TUNING.staminaMax;
     this.breath = PLAYER_TUNING.breathMax;
     this.dead = false;
@@ -88,7 +95,9 @@ export class Player {
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
     const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
     const mx = input.move.x, my = input.move.y;
-    const wish = new THREE.Vector3(fx * my + rx * mx, 0, fz * my + rz * mx);
+    const ctl = this.stunT > 0 ? 0 : 1;
+    if (this.stunT > 0) this.stunT -= dt;
+    const wish = new THREE.Vector3((fx * my + rx * mx) * ctl, 0, (fz * my + rz * mx) * ctl);
     const wishLen = Math.min(1, wish.length());
     if (wishLen > 0.01) wish.normalize();
 
@@ -144,7 +153,7 @@ export class Player {
       } else {
         if (this.state === 'climb') this.vel.y = Math.max(this.vel.y, 4.5); // vault over the top
         this.state = this.grounded ? 'ground' : 'air';
-        const sp = wishLen * (wantSprint && this.stamina > 0 ? T.sprint : T.walk);
+        const sp = wishLen * (wantSprint && this.stamina > 0 && !this.blocking ? T.sprint : T.walk) * (this.blocking ? 0.45 : 1) * this.slow;
         const accel = this.grounded ? 40 : 9;
         const tx = wish.x * sp, tz = wish.z * sp;
         const dx = tx - this.vel.x, dz = tz - this.vel.z;
@@ -207,7 +216,7 @@ export class Player {
 
     // ---- life regeneration
     this.sinceDamage += dt;
-    if (this.sinceDamage > 6) this.life = Math.min(T.lifeMax, this.life + 1.5 * dt);
+    if (this.sinceDamage > 6) this.life = Math.min(this.maxLife, this.life + 1.5 * dt);
 
     // ---- facing
     this.speed = Math.hypot(this.vel.x, this.vel.z);

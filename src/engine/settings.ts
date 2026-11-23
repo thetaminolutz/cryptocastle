@@ -11,6 +11,8 @@ export interface Settings {
   shadows: number;        // 0 off, 1 medium, 2 high
   vegetation: number;     // 0 low, 1 medium, 2 high (grass distance/density)
   pixelLook: boolean;     // retro nearest-neighbour upscale
+  damageNumbers: boolean;
+  hitSound: boolean;      // warning sound when hit (muting it is dangerous)
   showFps: boolean;
   autoQuality: boolean;
   particles: number;      // 0..1
@@ -35,6 +37,8 @@ const DEFAULTS: Settings = {
   ...PRESETS.medium,
   fpsCap: 60,
   pixelLook: false,
+  damageNumbers: true,
+  hitSound: true,
   showFps: false,
   autoQuality: true,
   masterVolume: 0.8,

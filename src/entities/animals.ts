@@ -20,21 +20,21 @@ interface SpeciesDef {
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
-function part(b: GeoBuilder, g: THREE.BufferGeometry, color: RGB, bone: number, pivot: THREE.Vector3) {
+export function part(b: GeoBuilder, g: THREE.BufferGeometry, color: RGB, bone: number, pivot: THREE.Vector3) {
   b.add(g, { layer: 'white', color, ao: (p) => 0.6 + 0.4 * Math.min(1, Math.max(0, p.y / 1.2)) }, undefined, [bone, pivot]);
 }
-function ellipsoid(rx: number, ry: number, rz: number, x: number, y: number, z: number) {
+export function ellipsoid(rx: number, ry: number, rz: number, x: number, y: number, z: number) {
   const g = new THREE.SphereGeometry(1, 12, 9); g.scale(rx, ry, rz); g.translate(x, y, z); return g;
 }
-function limb(r: number, len: number, x: number, top: number, z: number) {
+export function limb(r: number, len: number, x: number, top: number, z: number) {
   const g = new THREE.CapsuleGeometry(r, len, 2, 6); g.translate(x, top - len / 2 - r, z); return g;
 }
 
-interface Quad {
+export interface Quad {
   body: [number, number, number]; bodyY: number; legLen: number; legR: number; legX: number; legZ: number;
   head: [number, number, number]; headPos: [number, number, number]; neck?: number; color: RGB; dark: RGB; tail?: number;
 }
-function quadruped(b: GeoBuilder, q: Quad, extra?: (b: GeoBuilder) => void) {
+export function quadruped(b: GeoBuilder, q: Quad, extra?: (b: GeoBuilder) => void) {
   part(b, ellipsoid(q.body[0], q.body[1], q.body[2], 0, q.bodyY, 0), q.color, 0, V());
   const top = q.bodyY - q.body[1] * 0.3;
   const legs: [number, number, number][] = [[-q.legX, 1, -q.legZ], [q.legX, 2, -q.legZ], [-q.legX, 3, q.legZ], [q.legX, 4, q.legZ]];
@@ -102,10 +102,26 @@ SPECIES[Species.Fish] = { name: 'Fish', behaviour: 'fish', walk: 0.6, run: 4, fl
   part(b, tail, [0.45, 0.5, 0.58], 6, V(0, 0, 0.22));
 } };
 
-interface Animal {
+export interface Animal {
   sp: Species; pos: THREE.Vector3; yaw: number; speed: number; target: THREE.Vector3; timer: number;
   phase: number; graze: number; mode: 'idle' | 'walk' | 'run'; scale: number; home: THREE.Vector3; alt: number;
+  hp: number; maxHp: number; dead: boolean; deadT: number; looted: boolean; flash: number; tilt: number; atkT: number; atkCd: number; angry: number;
 }
+
+/** Hunting & fighting: hit points, bite damage and what the body yields. */
+export const ANIMAL_STATS: Record<number, { hp: number; dmg: number; loot: [string, number, number, number][]; bleed?: number }> = {
+  [Species.Rabbit]: { hp: 6, dmg: 0, loot: [['raw_meat', 1, 1, 1], ['hide', 0, 1, 0.4]] },
+  [Species.Deer]: { hp: 30, dmg: 0, loot: [['raw_meat', 2, 3, 1], ['hide', 1, 2, 1], ['bone', 0, 1, 0.5]] },
+  [Species.Boar]: { hp: 38, dmg: 9, loot: [['raw_meat', 2, 3, 1], ['hide', 1, 1, 1], ['fang', 0, 2, 0.6]] },
+  [Species.Wolf]: { hp: 34, dmg: 8, loot: [['raw_meat', 1, 2, 1], ['hide', 1, 1, 1], ['fang', 1, 2, 0.7]], bleed: 0.3 },
+  [Species.Bear]: { hp: 110, dmg: 20, loot: [['raw_meat', 3, 5, 1], ['hide', 2, 3, 1], ['fang', 1, 2, 0.8], ['bone', 1, 2, 0.6]], bleed: 0.35 },
+  [Species.Sheep]: { hp: 16, dmg: 0, loot: [['raw_meat', 1, 2, 1], ['fiber', 3, 6, 1]] },
+  [Species.Goat]: { hp: 20, dmg: 0, loot: [['raw_meat', 1, 2, 1], ['hide', 1, 1, 0.8]] },
+  [Species.Horse]: { hp: 50, dmg: 0, loot: [['raw_meat', 2, 4, 1], ['hide', 1, 2, 1]] },
+  [Species.Bird]: { hp: 4, dmg: 0, loot: [['raw_meat', 0, 1, 0.6]] },
+  [Species.Fish]: { hp: 4, dmg: 0, loot: [['raw_meat', 1, 1, 1]] }
+};
+export const SPECIES_NAME = (sp: Species) => SPECIES[sp].name;
 
 class SpeciesLayer {
   readonly mesh: THREE.Mesh;
@@ -134,10 +150,10 @@ class SpeciesLayer {
     for (let i = 0; i < n; i++) {
       const an = list[i], o = i * 4;
       a[o] = an.pos.x; a[o + 1] = an.pos.y; a[o + 2] = an.pos.z; a[o + 3] = an.yaw;
-      b[o] = an.scale; b[o + 1] = 0; b[o + 2] = 0; b[o + 3] = 0;
+      b[o] = an.scale; b[o + 1] = 0; b[o + 2] = an.tilt; b[o + 3] = an.flash;
       const def = SPECIES[an.sp];
       const move = def.behaviour === 'bird' ? 1 : Math.min(1.2, an.speed / Math.max(def.walk, 1));
-      c[o] = an.phase; c[o + 1] = move; c[o + 2] = def.behaviour === 'bird' ? (an.mode === 'idle' ? 0.15 : 1) : an.graze; c[o + 3] = 0;
+      c[o] = an.phase; c[o + 1] = move; c[o + 2] = def.behaviour === 'bird' ? (an.mode === 'idle' ? 0.15 : 1) : an.graze; c[o + 3] = an.atkT;
     }
     this.inst.needsUpdate = this.inst2.needsUpdate = this.anim.needsUpdate = true;
     this.geo.instanceCount = n;
@@ -156,6 +172,33 @@ export class Wildlife {
   private rnd = Math.random;
   /** set by the game: true inside a lit, claimed plot (no predators spawn there) */
   isSafe: (p: THREE.Vector3) => boolean = () => false;
+  /** set by the game: a predator bites the player */
+  onAttack: (a: Animal, dmg: number, bleed: number) => void = () => {};
+
+  get all(): Animal[] { return this.animals; }
+
+  damage(a: Animal, amount: number, from: THREE.Vector3 | null): number {
+    if (a.dead) return 0;
+    a.hp -= amount; a.flash = 1; a.angry = 12;
+    if (from) { const d = a.pos.clone().sub(from).setY(0).normalize(); a.pos.addScaledVector(d, 0.3); }
+    if (a.hp <= 0) { a.hp = 0; a.dead = true; a.deadT = 0; }
+    else if (!ANIMAL_STATS[a.sp].dmg) { a.mode = 'run'; a.timer = 3; const d = a.pos.clone().sub(from ?? a.pos).setY(0); a.target.set(a.pos.x + d.x * 6 + 1, 0, a.pos.z + d.z * 6); }
+    return amount;
+  }
+  inArc(pos: THREE.Vector3, yaw: number, reach: number): Animal[] {
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    return this.animals.filter((a) => {
+      if (a.dead) return false;
+      const dx = a.pos.x - pos.x, dz = a.pos.z - pos.z, d = Math.hypot(dx, dz);
+      if (d > reach + 0.5 * a.scale || Math.abs(a.pos.y - pos.y) > 2.5) return false;
+      return d < 0.8 || (dx * fx + dz * fz) / d > 0.35;
+    });
+  }
+  lootable(pos: THREE.Vector3, r = 2.4): Animal | null {
+    let best: Animal | null = null, bd = r * r;
+    for (const a of this.animals) { if (!a.dead || a.looted) continue; const d = a.pos.distanceToSquared(pos); if (d < bd) { bd = d; best = a; } }
+    return best;
+  }
 
   constructor(private world: World, private gen: TerrainGen, shadows: ShadowSystem) {
     SPECIES.forEach((def) => {
@@ -173,7 +216,7 @@ export class Wildlife {
     if (this.spawnTimer <= 0) { this.spawnTimer = 0.8; this.trySpawn(player); }
     for (let i = this.animals.length - 1; i >= 0; i--) {
       const a = this.animals[i];
-      if (a.pos.distanceToSquared(player) > 95 * 95 || !this.world.isLoaded(a.pos.x, a.pos.z)) { this.animals.splice(i, 1); continue; }
+      if (a.pos.distanceToSquared(player) > 95 * 95 || !this.world.isLoaded(a.pos.x, a.pos.z) || (a.dead && a.deadT > (a.looted ? 20 : 120))) { this.animals.splice(i, 1); continue; }
       this.think(a, dt, player, night);
     }
     const bySpecies: Animal[][] = SPECIES.map(() => []);
@@ -208,12 +251,33 @@ export class Wildlife {
       const alt = def.behaviour === 'bird' ? 12 + this.rnd() * 18 : 0;
       if (def.behaviour === 'bird') pos.y += alt;
       if (def.behaviour === 'fish') pos.y = water - 0.6 - this.rnd() * Math.max(0, water - gy - 1.2);
-      this.animals.push({ sp, pos, yaw: this.rnd() * 6.28, speed: 0, target: pos.clone(), timer: this.rnd() * 3, phase: this.rnd() * 6, graze: 0, mode: 'idle', scale: 0.85 + this.rnd() * 0.3, home: pos.clone(), alt });
+      const hp = ANIMAL_STATS[sp].hp;
+      this.animals.push({ sp, pos, yaw: this.rnd() * 6.28, speed: 0, target: pos.clone(), timer: this.rnd() * 3, phase: this.rnd() * 6, graze: 0, mode: 'idle', scale: 0.85 + this.rnd() * 0.3, home: pos.clone(), alt, hp, maxHp: hp, dead: false, deadT: 0, looted: false, flash: 0, tilt: 0, atkT: 0, atkCd: 0, angry: 0 });
     }
   }
 
   private think(a: Animal, dt: number, player: THREE.Vector3, night: boolean) {
     const def = SPECIES[a.sp];
+    a.flash = Math.max(0, a.flash - dt * 4);
+    if (a.dead) {
+      a.deadT += dt; a.tilt = Math.min(Math.PI / 2, a.tilt + dt * 4); a.speed = 0; a.atkT = 0;
+      if (def.behaviour === 'bird' || def.behaviour === 'fish') a.pos.y = Math.max(this.world.groundNear(a.pos.x, a.pos.z, a.pos.y), a.pos.y - dt * 6);
+      return;
+    }
+    // predators: bite when close (and when provoked)
+    const st = ANIMAL_STATS[a.sp];
+    a.angry = Math.max(0, a.angry - dt);
+    a.atkCd -= dt;
+    a.atkT = Math.max(0, a.atkT - dt * 3);
+    const near = Math.hypot(player.x - a.pos.x, player.z - a.pos.z);
+    if (st.dmg > 0 && near < 2.1 && (def.behaviour === 'predator' || a.angry > 0) && (a.sp !== Species.Bear || a.angry > 0 || near < 1.6)) {
+      a.yaw += Math.atan2(Math.sin(Math.atan2(-(player.x - a.pos.x), -(player.z - a.pos.z)) - a.yaw), Math.cos(Math.atan2(-(player.x - a.pos.x), -(player.z - a.pos.z)) - a.yaw)) * Math.min(1, dt * 8);
+      if (a.atkCd <= 0) { a.atkCd = 1.6; a.atkT = 1; this.onAttack(a, st.dmg, st.bleed ?? 0); }
+      a.speed *= 0.8;
+      a.phase += dt * 3;
+      return;
+    }
+    if (a.angry > 0 && st.dmg > 0 && near < 25) { a.target.set(player.x, 0, player.z); a.mode = 'run'; a.timer = 1; }
     const toPlayer = Math.hypot(player.x - a.pos.x, player.z - a.pos.z);
     a.timer -= dt;
     if (def.behaviour === 'bird') {
@@ -237,10 +301,11 @@ export class Wildlife {
       const dx = a.pos.x - player.x, dz = a.pos.z - player.z, l = Math.hypot(dx, dz) || 1;
       a.target.set(a.pos.x + (dx / l) * 14, 0, a.pos.z + (dz / l) * 14);
       a.mode = 'run'; a.timer = 2;
-    } else if (def.behaviour === 'predator' && (a.sp === Species.Wolf ? night || toPlayer < 18 : toPlayer < 9) && toPlayer > 4) {
+    } else if (def.behaviour === 'predator' && (a.sp === Species.Wolf ? night || toPlayer < 18 : toPlayer < 9) && toPlayer > (a.sp === Species.Wolf && night ? 1.6 : 4)) {
       // stalk: keep a menacing distance (attacks arrive with combat)
       const dx = player.x - a.pos.x, dz = player.z - a.pos.z;
-      a.target.set(player.x - (dx / toPlayer) * 6, 0, player.z - (dz / toPlayer) * 6);
+      const keep = a.sp === Species.Wolf && night ? 1.2 : 6;
+      a.target.set(player.x - (dx / toPlayer) * keep, 0, player.z - (dz / toPlayer) * keep);
       a.mode = toPlayer > 12 ? 'run' : 'walk'; a.timer = 1;
     } else if (a.timer <= 0) {
       if (this.rnd() < 0.45) { a.mode = 'idle'; a.timer = 2 + this.rnd() * 5; }

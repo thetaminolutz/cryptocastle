@@ -3,7 +3,10 @@
 // in the hero's hand.
 import * as THREE from 'three';
 import { input } from '../engine/input';
-import { ITEMS, MINE, PLANT_DROPS, TREE_DROPS, ToolKind } from '../data/items';
+import { ITEMS, MINE, PLANT_DROPS, TREE_DROPS, ToolKind, weaponOf } from '../data/items';
+import type { Combat } from './combat';
+import type { Creatures } from '../entities/creatures';
+import type { Wildlife } from '../entities/animals';
 import type { Inventory } from './inventory';
 import type { World, TreeHit } from '../world/world';
 import type { Player } from '../entities/player';
@@ -88,6 +91,14 @@ export class Interaction {
   private heldId: string | null | undefined = undefined;
   private action: (() => void) | null = null;
   readonly group = new THREE.Group();
+  combat: Combat | null = null;
+  /** game-provided action that takes priority (e.g. recover your pack) */
+  extra: (() => { label: string; run: () => void } | null) | null = null;
+  creatures: Creatures | null = null;
+  wildlife: Wildlife | null = null;
+  private heavy = false;
+  private combo = 0;
+  private queued = false;
 
   constructor(private world: World, private player: Player, private hero: HeroModel, private inv: Inventory, private props: Props, private building: Building, private ui: InteractUI) {
     this.marker = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.3, 24), new THREE.MeshBasicMaterial({ color: 0xffe8b0, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
@@ -117,20 +128,27 @@ export class Interaction {
     this.updateAttackLabel();
     this.updateAction();
 
-    // swings
+    // swings: tap = light (press again mid-swing for a 3-hit combo), hold = charged heavy
     const attack = input.button('attack');
-    const busy = this.player.state === 'swim' || this.player.state === 'climb' || this.player.state === 'roll';
-    if (this.swing < 0 && attack.down && !busy && this.harvestT < 0) {
-      const t = this.tool();
+    const busy = this.player.state === 'swim' || this.player.state === 'climb' || this.player.state === 'roll' || this.player.stunT > 0 || this.player.blocking;
+    const fighting = !!this.creatures && this.creatures.alive.some((c) => c.state !== 'hidden' && c.pos.distanceTo(this.player.pos) < 9);
+    const speed = weaponOf(this.inv.held?.id).speed;
+    if (this.swing >= 0.5 && attack.pressed) this.queued = true;
+    if (this.swing < 0 && (attack.down || this.queued) && !busy && this.harvestT < 0) {
       const s = this.inv.held;
       if (s && ITEMS[s.id].food && attack.pressed) { this.eat(); }
       else if (!s || !ITEMS[s.id].food) {
-        this.swing = 0; this.impactDone = false;
-        this.swingDur = 0.6 / (t?.speed ?? 1);
-        if (this.player.stamina > 3) this.player.stamina -= 3;
+        this.combo = this.queued ? (this.combo + 1) % 3 : 0;
+        this.queued = false;
+        this.swing = 0; this.impactDone = false; this.heavy = false;
+        this.swingDur = 0.58 / speed;
       }
     }
     if (this.swing >= 0) {
+      // keep holding during the wind-up in a fight → charged heavy strike
+      if (fighting && !this.heavy && this.swing < 0.35 && attack.down && attack.held > 0.3 && this.player.stamina > 15) {
+        this.heavy = true; this.swingDur *= 1.7;
+      }
       this.swing += dt / this.swingDur;
       if (!this.impactDone && this.swing >= 0.62) { this.impactDone = true; this.impact(); }
       if (this.swing >= 1) this.swing = -1;
@@ -210,6 +228,8 @@ export class Interaction {
 
   // ---------------------------------------------------------------- effects
   private impact() {
+    // creatures and animals in front take the blow first
+    if (this.combat && this.combat.playerAttack(this.heavy, this.combo)) return;
     const t = this.target;
     const tool = this.tool();
     if (!t) return;
@@ -273,8 +293,9 @@ export class Interaction {
     const s = this.inv.held;
     if (!s) return;
     const food = ITEMS[s.id].food!;
-    this.player.life = Math.min(100, this.player.life + food.heal);
+    this.player.life = Math.min(this.player.maxLife, this.player.life + food.heal);
     if (food.stamina) this.player.stamina = Math.min(100, this.player.stamina + food.stamina);
+    if (food.cures) { this.combat?.cure(food.cures); this.ui.toast(food.cures === 'bleed' ? 'The bleeding stops.' : 'The poison fades.', '#a8e0a0'); }
     this.ui.toast(`You eat the ${ITEMS[s.id].name.toLowerCase()}.`, '#a8e0a0');
     this.inv.consume(this.inv.selected);
     this.harvestT = 0.35;
@@ -290,6 +311,9 @@ export class Interaction {
     if (def?.place && this.player.state === 'ground') {
       label = `Place ${def.name}`;
       this.action = () => this.placeHeld();
+    } else if (this.extra?.()) {
+      const x = this.extra()!;
+      label = x.label; this.action = x.run;
     } else {
       // nearest harvestable plant in front of the player
       const fwd = V(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw));
@@ -298,7 +322,19 @@ export class Interaction {
       const plant = near.find((q) => PLANT_DROPS[q.kind]);
       const station = this.props.nearest(p, 2.4);
       const piece = this.building.usable(p, this.player.yaw);
-      if (piece) {
+      const body = this.creatures?.lootable(p) ?? null;
+      const carcass = body ? null : this.wildlife?.lootable(p) ?? null;
+      if (body || carcass) {
+        const target = (body ?? carcass)!;
+        label = `Loot ${body ? body.def.name : 'carcass'}`;
+        this.action = () => {
+          this.harvestT = 0;
+          this.harvestJob = () => {
+            const got = this.combat!.loot(target);
+            this.ui.toast(got.length ? `Looted: ${got.join(', ')}` : 'Nothing of value.', '#e8d8a8');
+          };
+        };
+      } else if (piece) {
         const use = PIECES[piece.id].use;
         if (use === 'door') { label = piece.open ? 'Close door' : 'Open door'; this.action = () => this.building.toggleDoor(piece); }
         else if (use === 'bed') { label = 'Sleep'; this.action = () => this.ui.sleep(piece); }

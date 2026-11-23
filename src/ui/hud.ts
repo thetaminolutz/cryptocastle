@@ -13,6 +13,12 @@ export class Hud {
   private gold: HTMLDivElement;
   private flash: HTMLDivElement;
   private banner: HTMLDivElement;
+  private target: HTMLDivElement;
+  private targetFill: HTMLDivElement;
+  private targetName: HTMLDivElement;
+  private statusRow: HTMLDivElement;
+  private level: HTMLDivElement;
+  readonly lockMark: HTMLDivElement;
   private bannerTimer = 0;
   private last = '';
 
@@ -49,11 +55,21 @@ export class Hud {
     const menu = btn('menu-btn', '☰', onMenu);
     const view = btn('menu-btn view-btn', '◐', onView);
     const build = btn('menu-btn build-btn', '⚒', onBuild);
+    this.target = document.createElement('div'); this.target.className = 'target-bar';
+    this.targetName = document.createElement('div'); this.targetName.className = 'tname';
+    const tb = document.createElement('div'); tb.className = 'bar life tbar';
+    this.targetFill = document.createElement('div'); this.targetFill.className = 'fill'; tb.appendChild(this.targetFill);
+    this.target.append(this.targetName, tb);
+    this.statusRow = document.createElement('div'); this.statusRow.className = 'status-row';
+    bars.appendChild(this.statusRow);
+    this.level = document.createElement('div'); this.level.className = 'hud-level';
+    bars.appendChild(this.level);
+    this.lockMark = document.createElement('div'); this.lockMark.className = 'lock-mark';
     this.banner = document.createElement('div');
     this.banner.className = 'region-banner';
     const vignette = document.createElement('div');
     vignette.className = 'vignette';
-    this.root.append(vignette, this.flash, this.banner, this.top, bars, menu, view, build);
+    this.root.append(vignette, this.flash, this.banner, this.top, this.target, this.lockMark, bars, menu, view, build);
     parent.appendChild(this.root);
   }
 
@@ -67,6 +83,22 @@ export class Hud {
     this.bannerTimer = window.setTimeout(() => { this.banner.style.opacity = '0'; }, 4200);
   }
 
+  setTarget(name: string | null, frac = 0, elite = false) {
+    this.target.style.display = name ? 'block' : 'none';
+    if (!name) return;
+    this.targetName.textContent = elite ? `★ ${name}` : name;
+    this.targetName.style.color = elite ? '#e8b030' : '#e8dcc0';
+    this.targetFill.style.width = `${Math.max(0, frac) * 100}%`;
+  }
+  setStatus(list: [string, string][]) {
+    const key = list.map((s) => s[0]).join();
+    if (this.statusRow.dataset.k === key) return;
+    this.statusRow.dataset.k = key;
+    this.statusRow.innerHTML = '';
+    for (const [t, c] of list) { const e = document.createElement('span'); e.textContent = t; e.style.borderColor = c; e.style.color = c; this.statusRow.appendChild(e); }
+  }
+  setLevel(level: number, frac: number) { this.level.textContent = `Lv ${level}`; this.level.style.setProperty('--xp', `${frac * 100}%`); }
+
   hurt() {
     this.flash.style.transition = 'none';
     this.flash.style.opacity = '0.55';
@@ -79,7 +111,7 @@ export class Hud {
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     const moon = hours < 5.5 || hours > 18.5 ? '☾' : '☀';
     const text = `${moon} ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}   ◆ ${dirs[Math.round(deg / 45) % 8]}`;
-    const life = (p.life / PLAYER_TUNING.lifeMax) * 100, st = (p.stamina / PLAYER_TUNING.staminaMax) * 100;
+    const life = (p.life / p.maxLife) * 100, st = (p.stamina / PLAYER_TUNING.staminaMax) * 100;
     const br = (p.breath / PLAYER_TUNING.breathMax) * 100;
     const key = `${text}|${life.toFixed(0)}|${st.toFixed(0)}|${br.toFixed(0)}|${gold}|${p.exhausted}`;
     if (key === this.last) return;

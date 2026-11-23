@@ -21,7 +21,6 @@ import { CameraRig } from '../entities/camera-rig';
 import { Wildlife } from '../entities/animals';
 import { Hud } from '../ui/hud';
 import { TouchControls } from '../ui/touch';
-import { showToast } from '../ui/toast';
 import { Inventory } from './inventory';
 import { Interaction } from './interaction';
 import { Props } from '../world/props';
@@ -30,11 +29,16 @@ import { Menu } from '../ui/menu';
 import { saves, SaveData, SAVE_VERSION } from '../engine/save';
 import { Building, Piece } from '../world/building';
 import { BuildMode } from './build-mode';
+import { Creatures } from '../entities/creatures';
+import { Combat, STATUS_LABEL, levelWord, xpForLevel } from './combat';
+import { showDeath } from '../ui/screens';
+import { ITEMS } from '../data/items';
+import { HOTBAR, Stack } from './inventory';
 import type { AABB } from '../world/building';
 
 const SPAWN = { x: 0.5, z: 0.5 };
 
-export interface GameStart { slot: number; seed: number; data: SaveData | null; }
+export interface GameStart { slot: number; seed: number; data: SaveData | null; mode: 'wanderer' | 'onelife'; }
 
 export class Game {
   private renderer: Renderer;
@@ -59,6 +63,12 @@ export class Game {
   private spawned = false;
   private elapsed = 0;
   private gold = 0;
+  readonly creatures: Creatures;
+  readonly combat: Combat;
+  private shake = 0;
+  private lostPack: { x: number; y: number; z: number; items: (Stack | null)[] } | null = null;
+  private lostMarker: THREE.Mesh;
+  private dying = false;
   readonly inventory = new Inventory();
   readonly props: Props;
   readonly building: Building;
@@ -91,7 +101,10 @@ export class Game {
     this.props = new Props(this.shadows);
     this.building = new Building(this.shadows);
     this.wildlife.isSafe = (p) => this.building.isSafe(p);
-    this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi, this.props.group, this.building.group);
+    this.creatures = new Creatures(this.world, this.gen, this.building, this.shadows, { strike: () => {}, toast: (t, c) => this.hotbar.notify(t, c) });
+    this.lostMarker = new THREE.Mesh(new THREE.OctahedronGeometry(0.25, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.5, 2.2, 1.2) }));
+    this.lostMarker.visible = false;
+    this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi, this.props.group, this.building.group, this.creatures.group, this.lostMarker);
     this.shadows.add(this.model.root);
     this.scene.fog = this.fog;
     this.applySettings();
@@ -101,7 +114,8 @@ export class Game {
       { name: 'jump', label: 'Jump', size: 92, right: 30, bottom: 30 },
       { name: 'attack', label: 'Strike', size: 92, right: 140, bottom: 92 },
       { name: 'dodge', label: 'Dodge', size: 68, right: 34, bottom: 140 },
-      { name: 'interact', label: 'Use', size: 84, right: 150, bottom: 200 }
+      { name: 'interact', label: 'Use', size: 84, right: 150, bottom: 200 },
+      { name: 'block', label: 'Block', size: 76, right: 246, bottom: 34 }
     ]);
     this.hud = new Hud(ui, () => this.openMenu(), () => { this.rig.firstPerson = !this.rig.firstPerson; }, () => this.build.toggle());
     this.hotbar = new Hotbar(ui, this.inventory);
@@ -132,6 +146,30 @@ export class Game {
     });
     this.scene.add(this.interaction.group);
     this.touch.setVisible('interact', false);
+    this.combat = new Combat(ui, this.player, this.creatures, this.wildlife, this.inventory, {
+      toast: (t, c) => this.hotbar.notify(t, c),
+      addGold: (n) => { this.gold += n; },
+      shake: (a) => { this.shake = Math.max(this.shake, a); },
+      onLevel: (lv) => { this.hotbar.notify(`You're a ${levelWord(lv)} now.`, '#f0d070'); audio.parry(); }
+    });
+    this.interaction.combat = this.combat;
+    this.interaction.creatures = this.creatures;
+    this.interaction.wildlife = this.wildlife;
+    this.interaction.extra = () => {
+      const lp = this.lostPack;
+      if (!lp || this.player.pos.distanceTo(new THREE.Vector3(lp.x, lp.y, lp.z)) > 2.5) return null;
+      return { label: 'Recover your pack', run: () => {
+        let lost = 0;
+        for (const st of lp.items) if (st) lost += this.inventory.add(st.id, st.n);
+        this.lostPack = null;
+        this.hotbar.notify(lost ? 'You recover what you can carry.' : 'You recover your belongings.', '#e8d8a8');
+      } };
+    };
+    this.touch.onTap = (x, y) => {
+      if (this.build.active) return;
+      const ndc = new THREE.Vector2((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+      this.combat.tapTarget(ndc, this.renderer.camera);
+    };
 
     // restore or start fresh
     const d = start0.data;
@@ -144,15 +182,15 @@ export class Game {
       this.spawnAt = { x: d.player.pos[0], y: d.player.pos[1], z: d.player.pos[2], yaw: d.player.yaw };
       this.player.life = d.player.life; this.player.stamina = d.player.stamina;
       this.building.load(d.building);
+      const st = d.stats!;
+      this.gold = st.gold; this.combat.xp = st.xp; this.combat.level = st.level; this.player.maxLife = st.maxLife; this.creatures.kills = { ...st.kills };
+      this.lostPack = d.lostPack ?? null;
     } else {
       this.inventory.add('staff', 1);
     }
 
     this.player.onDamage = () => this.hud.hurt();
-    this.player.onDeath = (cause) => {
-      showToast(`You died of ${cause}. You wake again in the hollow.`, undefined, 4000);
-      setTimeout(() => this.respawn(), 1800);
-    };
+    this.player.onDeath = (cause) => this.die(cause);
     this.weather.onThunder = () => audio.thunder();
 
     document.addEventListener('visibilitychange', () => { this.setPaused(document.hidden); if (document.hidden) void this.save(); });
@@ -182,13 +220,15 @@ export class Game {
   buildSave(): SaveData {
     const p = this.player;
     return {
-      version: SAVE_VERSION, slot: this.start0.slot, seed: this.start0.seed, mode: 'wanderer',
+      version: SAVE_VERSION, slot: this.start0.slot, seed: this.start0.seed, mode: this.start0.mode,
       created: this.created, updated: Date.now(), playTime: this.playTime, day: this.sky.day, time: this.sky.time,
       player: { pos: [p.pos.x, p.pos.y, p.pos.z], yaw: p.yaw, life: p.life, stamina: p.stamina },
       inventory: this.inventory.serialize() as SaveData['inventory'],
       world: this.world.serializeDelta(),
       props: this.props.list,
-      building: this.building.serialize()
+      building: this.building.serialize(),
+      stats: { gold: this.gold, xp: this.combat.xp, level: this.combat.level, maxLife: this.player.maxLife, kills: this.creatures.kills },
+      lostPack: this.lostPack
     };
   }
 
@@ -207,6 +247,34 @@ export class Game {
     if (bed) { this.player.spawn(bed.x, bed.y + 0.6, bed.z); return; }
     const y = this.world.groundY(SPAWN.x, SPAWN.z);
     this.player.spawn(SPAWN.x, y + 0.05, SPAWN.z);
+  }
+
+  /** Death: Wanderer wakes at home and leaves the pack behind; One Life ends forever. */
+  private die(cause: string) {
+    if (this.dying) return;
+    this.dying = true;
+    this.combat.status.clear();
+    this.combat.lock = null;
+    if (this.start0.mode === 'onelife') {
+      const day = this.sky.day + 1, level = this.combat.level;
+      void (async () => {
+        await saves.remove(this.start0.slot);
+        await saves.addGrave({ name: 'The Nameless One', cause, day, level, date: Date.now(), seed: this.start0.seed });
+      })();
+      this.spawned = false; // no more saving
+      setTimeout(() => showDeath('HERE ENDS THE JOURNEY', `The Nameless One — a ${levelWord(level)} — died of ${cause} on day ${day}. A stone in the Cemetery of the Fallen now bears their name. There was only ever one chance.`, 'Return', () => { location.href = location.pathname; }), 1500);
+      return;
+    }
+    const lostGold = Math.floor(this.gold * 0.1);
+    this.gold -= lostGold;
+    // everything in the pack (not the belt) stays where you fell
+    const items: (Stack | null)[] = [];
+    for (let i = HOTBAR; i < this.inventory.slots.length; i++) { if (this.inventory.slots[i]) items.push(this.inventory.slots[i]); this.inventory.slots[i] = null; }
+    this.inventory.changed();
+    if (items.length) { const p = this.player.pos; this.lostPack = { x: p.x, y: p.y, z: p.z, items }; }
+    setTimeout(() => showDeath('YOU HAVE FALLEN', `You died of ${cause}.${lostGold ? ` ${lostGold} gold slipped from your purse.` : ''}${items.length ? ' Your pack lies where you fell — go back for it.' : ''}`, 'Wake', () => {
+      this.respawn(); this.dying = false; void this.save();
+    }), 1200);
   }
 
   /** Sleep in a bed: sets the respawn point; at night, skip to morning. */
@@ -275,8 +343,32 @@ export class Game {
     // the world map: the hotbar via number keys
     for (let i = 0; i < 6; i++) if (input.key(`Digit${i + 1}`)) { this.inventory.selected = i; this.inventory.changed(); }
     const cam = this.renderer.camera;
+    // target lock: turn the camera toward the locked enemy
+    const lock = this.combat.lock;
+    if (lock) {
+      const want = Math.atan2(this.player.pos.x - lock.pos.x, this.player.pos.z - lock.pos.z);
+      let d = want - this.rig.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+      this.rig.yaw += d * Math.min(1, dt * 6);
+      this.rig.pitch += (-0.18 - this.rig.pitch) * Math.min(1, dt * 3);
+    }
     this.rig.update(dt, cam, this.player, this.world);
+    if (this.shake > 0.001) {
+      cam.position.x += (Math.random() - 0.5) * this.shake; cam.position.y += (Math.random() - 0.5) * this.shake;
+      this.shake *= Math.exp(-dt * 10);
+    }
     if (this.spawned && !this.build.active) this.interaction.update(dt, cam, this.elapsed);
+    if (this.spawned) {
+      this.combat.update(dt, cam);
+      this.creatures.update(dt, this.player.pos, this.sky.isNight);
+      this.model.blocking = this.player.blocking;
+      const sh = [0, 1, 2, 3, 4, 5].map((i) => this.inventory.slots[i]).find((x) => x && ITEMS[x.id].shield);
+      this.model.setShield(sh ? sh.id : null);
+    }
+    if (this.lostPack) {
+      this.lostMarker.visible = true;
+      this.lostMarker.position.set(this.lostPack.x, this.lostPack.y + 0.8 + Math.sin(this.elapsed * 2) * 0.15, this.lostPack.z);
+      this.lostMarker.rotation.y += dt;
+    } else this.lostMarker.visible = false;
     if (this.spawned) this.build.update(dt, cam);
     this.model.update(dt, this.player, !this.rig.firstPerson && this.spawned);
 
@@ -313,6 +405,18 @@ export class Game {
     input.endFrame();
 
     this.hud.update(this.sky.hours, this.rig.yaw, this.player, this.gold);
+    // enemy bar, lock marker, statuses, level
+    const t = this.combat.lock ?? this.combat.lastHit;
+    if (t && 'def' in t && t.state !== 'dead' && t.pos.distanceTo(this.player.pos) < 30) this.hud.setTarget(t.def.name, t.hp / t.maxHp, t.elite);
+    else if (t && !('def' in t) && !t.dead && t.pos.distanceTo(this.player.pos) < 30) this.hud.setTarget('Wild animal', t.hp / t.maxHp);
+    else this.hud.setTarget(null);
+    if (lock) {
+      const v = lock.pos.clone().setY(lock.pos.y + lock.hover + lock.def.height * 0.6).project(cam);
+      Object.assign(this.hud.lockMark.style, { display: v.z < 1 ? 'block' : 'none', left: `${(v.x * 0.5 + 0.5) * innerWidth}px`, top: `${(-v.y * 0.5 + 0.5) * innerHeight}px` });
+    } else this.hud.lockMark.style.display = 'none';
+    this.hud.setStatus([...this.combat.status.keys()].map((s) => STATUS_LABEL[s]));
+    const lv = this.combat.level;
+    this.hud.setLevel(lv, (this.combat.xp - xpForLevel(lv)) / Math.max(1, xpForLevel(lv + 1) - xpForLevel(lv)));
     if (settings.values.showFps) {
       const info = this.renderer.gl.info;
       const p = this.player.pos;
