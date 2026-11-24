@@ -19,6 +19,8 @@ export class Inventory {
   /** worn equipment */
   equip: Partial<Record<EquipKey, Stack>> = {};
   private listeners: (() => void)[] = [];
+  /** an item entered the pack (Codex collections) */
+  onAdd: ((id: string) => void) | null = null;
 
   onChange(fn: () => void) { this.listeners.push(fn); }
   changed() { for (const l of this.listeners) l(); }
@@ -35,6 +37,7 @@ export class Inventory {
   add(id: string, n: number): number {
     const def = ITEMS[id];
     if (!def) return n;
+    if (n > 0) this.onAdd?.(id);
     const max = def.stack ?? 99;
     for (let i = 0; i < this.slots.length && n > 0; i++) {
       const s = this.slots[i];
@@ -60,6 +63,7 @@ export class Inventory {
     const j = i >= 0 ? i : this.slots.findIndex((x) => !x);
     if (j < 0) return false;
     this.slots[j] = { ...st };
+    this.onAdd?.(st.id);
     this.changed();
     return true;
   }

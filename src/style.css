@@ -333,3 +333,23 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 /* ---- the Living Fresco */
 .fresco-box { max-width: min(1240px, 96vw); width: 100%; }
 .fresco-canvas { width: 100%; height: auto; display: block; margin: 8px 0 12px; border: 3px solid #3a2414; box-shadow: inset 0 0 40px #000; }
+
+/* ---- codex */
+.codex-tabs { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.codex-tabs button { font: inherit; background: #1a1210; color: #a8987c; border: 2px solid #3a2618; padding: 8px 14px; min-height: 44px; letter-spacing: 1px; }
+.codex-tabs button.on { color: var(--gold); border-color: var(--gold); }
+.codex-body { max-height: 62vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.codex-sum { color: #a8987c; }
+.codex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.codex-card { background: #1a1210; border: 2px solid #3a2618; padding: 10px; margin-bottom: 8px; }
+.codex-card b { display: block; color: var(--gold); margin-bottom: 4px; }
+.codex-card b em { font-style: normal; color: #e05040; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.codex-card span { display: block; font-size: 13px; color: #c8b890; line-height: 1.4; }
+.codex-card small { display: block; margin-top: 6px; color: #8a7a62; font-size: 12px; }
+.codex-card.unknown { opacity: .45; }
+.codex-card.got { border-color: #6a5a2a; }
+.codex-icons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.codex-icon { width: 84px; text-align: center; font-size: 11px; }
+.codex-icon img { width: 48px; height: 48px; display: block; margin: 0 auto 2px; }
+.codex-icon.unknown img { filter: brightness(0) opacity(.5); }
+.codex-list { color: #c8b890; line-height: 1.6; }

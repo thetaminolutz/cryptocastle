@@ -81,6 +81,8 @@ export class Creatures {
   /** kills per enemy id (bestiary) */
   kills: Record<string, number> = {};
   enabled = true;
+  /** extra elite chance and damage (blood moon) */
+  eliteBonus = 0;
   private rings: THREE.Mesh[] = [];
   /** called once when a creature dies (quests, arena) */
   onDeath: ((c: Creature) => void) | null = null;
@@ -102,7 +104,7 @@ export class Creatures {
   get allies() { return this.list.filter((c) => c.state !== 'dead' && c.ally); }
 
   spawn(def: EnemyDef, pos: THREE.Vector3, danger: number, slot = 0) {
-    const elite = Math.random() < 0.05 + Math.min(0.1, danger * 0.01);
+    const elite = Math.random() < 0.05 + Math.min(0.1, danger * 0.01) + this.eliteBonus;
     const scaleHp = 1 + (danger - 1) * 0.18;
     const hp = def.hp * scaleHp * (elite ? 2.2 : 1);
     const c: Creature = {

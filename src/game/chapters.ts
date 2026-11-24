@@ -37,6 +37,8 @@ export class Chapters {
   readonly lab: Labyrinth;
   readonly labEntrance: { x: number; z: number };
   stash: (Stack | null)[] = new Array(24).fill(null);
+  /** generated notices for the quest board */
+  extraNotices: (() => import('../data/quests').QuestDef[]) | null = null;
   /** places provided by later chapters */
   extraPlace: ((p: Place) => { x: number; z: number } | null) | null = null;
   arenaWins = 0;
@@ -212,7 +214,7 @@ export class Chapters {
     const box = document.createElement('div'); box.className = 'menu-box panel'; box.style.maxWidth = '640px';
     const h = document.createElement('h2'); h.textContent = 'Quest Board';
     box.appendChild(h);
-    const list = Object.values(QUESTS).filter((q) => q.board);
+    const list = [...Object.values(QUESTS).filter((q) => q.board && !q.generated), ...(this.extraNotices?.() ?? [])];
     for (const q of list) {
       const card = document.createElement('div'); card.className = 'board-q';
       const st = this.quests.get(q.id);

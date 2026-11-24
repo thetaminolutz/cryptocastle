@@ -62,7 +62,7 @@ export class QuestLog {
       const objs = QUESTS[q.id].stages[q.stage].objectives;
       objs.forEach((o, i) => {
         if (o.kind !== 'kill' || o.enemy !== enemy || q.prog[i] >= o.n) return;
-        if (o.at && o.r) { const p = this.hooks.place(o.at); if (p && Math.hypot(p.x - pos.x, p.z - pos.z) > o.r) return; }
+        if (o.r) { const p = this.where(o); if (p && Math.hypot(p.x - pos.x, p.z - pos.z) > o.r) return; }
         q.prog[i]++;
         if (q.prog[i] < o.n) this.hooks.toast(`${o.text}: ${q.prog[i]}/${o.n}`, '#c8b890');
       });
@@ -75,7 +75,7 @@ export class QuestLog {
     for (const q of this.active()) {
       const objs = QUESTS[q.id].stages[q.stage].objectives;
       objs.forEach((o, i) => {
-        if (o.kind === 'goto' && !q.prog[i]) { const p = this.hooks.place(o.at); if (p && Math.hypot(p.x - pos.x, p.z - pos.z) < o.r) q.prog[i] = 1; }
+        if (o.kind === 'goto' && !q.prog[i]) { const p = this.where(o); if (p && Math.hypot(p.x - pos.x, p.z - pos.z) < o.r) q.prog[i] = 1; }
         if (o.kind === 'collect') q.prog[i] = Math.min(o.n, this.inv.count(o.item));
       });
       this.check(q);
@@ -115,13 +115,16 @@ export class QuestLog {
   }
 
   /** Current objective lines of a quest, with progress. */
-  objectives(id: string): { text: string; done: boolean; at: Place | null }[] {
+  /** where an objective points */
+  where(o: Objective): { x: number; z: number } | null { return o.pos ?? (o.at ? this.hooks.place(o.at) : null); }
+
+  objectives(id: string): { text: string; done: boolean; at: { x: number; z: number } | null }[] {
     const q = this.get(id)!;
     const def = QUESTS[id];
     if (q.done) return [];
     return def.stages[q.stage].objectives.map((o, i) => {
       const n = o.kind === 'kill' || o.kind === 'collect' ? ` (${Math.min(q.prog[i], o.n)}/${o.n})` : '';
-      return { text: o.text + n, done: this.objDone(o, q.prog[i]), at: o.at ?? null };
+      return { text: o.text + n, done: this.objDone(o, q.prog[i]), at: this.where(o) };
     });
   }
 
@@ -130,6 +133,6 @@ export class QuestLog {
     if (!this.tracked || !this.isActive(this.tracked)) return null;
     const o = this.objectives(this.tracked).find((x) => !x.done);
     if (!o) return null;
-    return { text: o.text, at: o.at ? this.hooks.place(o.at) : null };
+    return { text: o.text, at: o.at };
   }
 }

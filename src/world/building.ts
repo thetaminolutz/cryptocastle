@@ -124,6 +124,30 @@ const MODELS: Record<string, () => THREE.BufferGeometry> = {
     for (const s of [-1, 1]) { const m = new THREE.SphereGeometry(0.5, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); m.scale(0.6, 0.5, 2); m.translate(s * 0.9, 0, 0); b.add(m, { layer: 'dirt' }); }
     return b.build();
   },
+  lore_page: () => {
+    const b = new GeoBuilder();
+    box(b, 0.5, 0.5, 0.5, 0, 0.25, 0, 'stone_brick', [0.6, 0.55, 0.5]);
+    const page = new THREE.PlaneGeometry(0.32, 0.42); page.rotateX(-Math.PI / 2 + 0.25); page.translate(0, 0.53, 0); b.add(page, { layer: 'white', color: [0.95, 0.88, 0.7], glow: 0.4 });
+    return b.build();
+  },
+  meteor: () => {
+    const b = new GeoBuilder();
+    const rock = new THREE.IcosahedronGeometry(0.85, 1); rock.scale(1, 0.75, 1.1); rock.translate(0, 0.45, 0);
+    b.add(rock, { layer: 'basalt', color: [0.5, 0.45, 0.5] });
+    for (let i = 0; i < 7; i++) { const c = new THREE.OctahedronGeometry(0.16, 0); c.translate(Math.sin(i * 2.1) * 0.6, 0.6 + (i % 3) * 0.2, Math.cos(i * 2.1) * 0.6); b.add(c, { layer: 'white', color: [0.5, 0.8, 1.4], glow: 2 }); }
+    const ring = new THREE.RingGeometry(1.2, 2.6, 18); ring.rotateX(-Math.PI / 2); ring.translate(0, 0.03, 0); b.add(ring, { layer: 'ash', color: [0.3, 0.28, 0.27] });
+    return b.build();
+  },
+  caravan: () => {
+    const b = new GeoBuilder();
+    box(b, 2.0, 0.9, 3.4, 0, 0.95, 0, 'planks', [0.6, 0.45, 0.32], 0, [1, 1.7]);
+    const top = new THREE.CylinderGeometry(1.1, 1.1, 3.2, 12, 1, true, -Math.PI / 2, Math.PI); top.rotateX(Math.PI / 2); top.rotateZ(Math.PI / 2); top.rotateY(Math.PI / 2); top.translate(0, 1.4, 0);
+    b.add(top, { layer: 'fabric', color: [0.75, 0.25, 0.18], uvScale: [2, 2] });
+    for (const [x, z] of [[-1.05, -1.1], [1.05, -1.1], [-1.05, 1.1], [1.05, 1.1]]) { const w = new THREE.CylinderGeometry(0.45, 0.45, 0.1, 12); w.rotateZ(Math.PI / 2); w.translate(x, 0.45, z); b.add(w, { layer: 'planks', color: [0.4, 0.3, 0.2] }); }
+    box(b, 0.1, 0.1, 1.4, 0, 0.55, -2.3, 'planks', [0.4, 0.3, 0.2]);
+    flame(b, 0.9, 2.1, -1.8, 0.8);
+    return b.build();
+  },
   fresco: () => {
     const b = new GeoBuilder();
     box(b, 2.7, 1.45, 0.04, 0, 1.55, -0.02, 'white', [0.78, 0.6, 0.38], 0, [1, 1]);

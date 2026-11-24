@@ -22,7 +22,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M10 Quests, journal, map, main story chapters 1–4, the Pale Citadel | ✅ done |
 | M11 Remaining enemies, bosses, dungeons, unique items, armour sets | ✅ done |
 | M12 Herald errands, profile, wish shards, Living Fresco, endings | ✅ done |
-| M13 Procedural quests, world events, achievements, Codex | next |
+| M13 Procedural quests, world events, achievements, Codex | ✅ done |
+| M14 Adaptive audio | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -188,6 +189,19 @@ fight with its Warden), 11 (allies pledged by village guards who trust you) and
 12 (the assault on the Hollow King's black tower with your allies), ending in
 **three endings**: take the crown, shatter it, or — if you uncovered the truth —
 speak the sorcerer's name. The world stays open afterwards.
+
+**Endless side content (M13):** generated side quests from villagers (“Any
+trouble around here?”) and the Citadel's quest board (three fresh notices every
+three days): fetch and deliver, hunts, **bounties on named elites** (“Varra the
+Patient”), finding lost people, clearing camps, defending a village at night and
+bringing rare herbs — with map markers and the tracking arrow. **World events**
+rolled at dusk and dawn: a **blood moon** (red sky, bolder monsters, more elites),
+**falling stars** that leave a glowing crater of mithril, crystals and moonstone, a
+**travelling caravan** with rare wares and wish shards, **village festivals**, and
+**dragons** passing overhead. A **Codex** tab with the **bestiary** (fills in as you
+defeat enemies, with weaknesses and resistances), **collections** (herbarium,
+minerals, 12 ancient coins, unique items, regions and biomes — completing a set
+pays out), 20 **lore pages** hidden in dungeons, and **62 achievements**.
 
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera (tap an enemy to lock on), **Strike/Mine/Chop/Dig** (hold to keep swinging), **Block**,

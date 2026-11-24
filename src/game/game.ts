@@ -53,6 +53,12 @@ import { Watcher, WatchSave } from './watcher';
 import { Herald, HeraldSave } from './herald';
 import { Saga, SagaSave, Ending } from './saga';
 import { FrescoLog, FrescoEvent, FrescoKind, showFresco } from './fresco';
+import { OddJobs, JobsSave } from './oddjobs';
+import { WorldEvents, EventsSave } from './events';
+import { Codex, CodexSave } from './codex';
+import { COINS, LORE, AchState } from '../data/achievements';
+import { SETS } from '../data/gear';
+import { playScene } from '../ui/scene';
 import { SORCERER } from '../data/story';
 import { ENEMIES } from '../data/enemies';
 
@@ -125,6 +131,11 @@ export class Game {
   readonly saga: Saga;
   readonly fresco = new FrescoLog();
   private fightSeen = new Set<object>();
+  readonly jobs: OddJobs;
+  readonly events: WorldEvents;
+  readonly codex = new Codex();
+  private achTimer = 3;
+  private lastDay = -1;
   private questTimer = 0;
   traits!: Traits;
   private creating = false;
@@ -188,6 +199,7 @@ export class Game {
         travel: this.travelMode ? (id, label) => this.travel(id, label) : undefined
       }),
       renderJournal: (host) => renderJournal(host, this.quests, () => {}),
+      renderCodex: (host) => this.codex.render(host, this.creatures.kills),
       itemAction: (id) => id === 'wish_shard' ? { label: 'Call the Herald', run: () => this.herald.wish() }
         : id === 'sealed_box' ? { label: 'Open the box', run: () => this.herald.openBox() } : null
     });
@@ -247,6 +259,13 @@ export class Game {
       extraOptions: (n) => {
         const v = this.villagers.villageOf(n);
         const out = [...this.chapters.dialogueOptions(n, () => this.dialogue.close()), ...this.herald.dialogueOptions(n.name, v.site.name, n.job, n.rep, () => this.dialogue.close())];
+        if (n.job !== 'child' && n.rep > -20 && !this.jobs.defs.some((q) => q.giver === n.name && !this.quests.isDone(q.id) && !!this.quests.get(q.id))) out.push(['“Any trouble around here?”', () => {
+          this.dialogue.close();
+          const q = this.jobs.make(v.site.x, v.site.z, n.name.split(' ')[0], v.site.name, 1 + Math.hypot(v.site.x, v.site.z) / 450 + this.combat.level * 0.05);
+          q.giver = n.name;
+          this.quests.start(q.id);
+          this.hotbar.notify(`${n.name.split(' ')[0]}: “${q.desc}”`, '#e8d8a8');
+        }]);
         if (n.job === 'guard') { const a = this.saga.allyOption(n.name.split(' ')[0], v.site.id, v.site.name, n.rep); if (a) out.push([a[0], () => { this.dialogue.close(); a[1](); }]); }
         return out;
       }
@@ -292,7 +311,7 @@ export class Game {
       toast: (t, c) => this.hotbar.notify(t, c), addGold: (n) => { this.gold += Math.round(n * this.combat.perks.gold); },
       day: () => this.sky.day, bossDead: () => false, log: (t) => this.logEvent('dungeon', t)
     });
-    this.creatures.onDeath = (c) => { this.quests.onKill(c.def.id, c.pos); if (c.def.boss) this.bossDefeated(c); if (c.elite && Math.random() < 0.1) { if (this.inventory.add('wish_shard', 1) === 0) this.hotbar.notify('A wish shard glows among the remains.', '#40e070'); } };
+    this.creatures.onDeath = (c) => { if (c.elite) this.codex.inc('elites'); if (!c.ally && Math.random() < 0.035) { const coin = COINS[Math.floor(Math.random() * COINS.length)]; if (this.inventory.add(coin, 1) === 0) this.hotbar.notify(`An old coin glints in the dirt: ${ITEMS[coin].name}.`, '#d8b050'); } this.quests.onKill(c.def.id, c.pos); if (c.def.boss) this.bossDefeated(c); if (c.elite && Math.random() < 0.1) { if (this.inventory.add('wish_shard', 1) === 0) this.hotbar.notify('A wish shard glows among the remains.', '#40e070'); } };
     this.watcher = new Watcher(this.player, this.creatures, () => this.regions.at(this.player.pos.x, this.player.pos.z).name);
     this.combat.onEvent = (e, kind) => this.watcher.event(e, kind);
     const remember = this.villagers.remember.bind(this.villagers);
@@ -344,6 +363,19 @@ export class Game {
       endingScreen: (e) => this.endingScreen(e)
     });
     this.chapters.extraPlace = (p) => this.saga.place(p);
+    this.jobs = new OddJobs(this.gen, this.world, this.player, this.creatures, this.quests);
+    this.chapters.extraNotices = () => { const c = this.chapters.citadel; return this.jobs.boardNotices(c.x, c.z, this.sky.day, 1 + Math.hypot(c.x, c.z) / 450 + this.combat.level * 0.05); };
+    this.events = new WorldEvents(ui, this.gen, this.building, this.player, this.creatures, this.inventory, this.map, {
+      toast: (t, c) => this.hotbar.notify(t, c), log: (k, t) => this.logEvent(k, t),
+      gold: () => this.gold, addGold: (n) => { this.gold = Math.max(0, this.gold + n); },
+      day: () => this.sky.day, hours: () => this.sky.hours,
+      villageHere: () => { const v = this.gen.village(this.player.pos.x, this.player.pos.z); return v && v.id !== 'citadel' ? { id: v.id, name: v.name, x: v.x, z: v.z } : null; },
+      pause: (p) => this.setPaused(p)
+    });
+    this.scene.add(this.events.group);
+    this.inventory.onAdd = (id) => this.codex.seen.add(id);
+    const craft = this.inventory.craft.bind(this.inventory);
+    this.inventory.craft = (r, st) => { const ok = craft(r, st); if (ok) this.codex.inc('crafted'); return ok; };
     this.touch.onTap = (x, y) => {
       if (this.build.active) return;
       const ndc = new THREE.Vector2((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
@@ -367,7 +399,10 @@ export class Game {
       this.villagers.saved = d.villagers ?? {};
       this.dialogue.shops = d.shops ?? {};
       this.story.load(d.story as StorySave | undefined);
+      this.jobs.load(d.jobs as JobsSave | undefined);
       this.quests.load(d.quests as QuestSave | undefined);
+      this.events.load(d.events as EventsSave | undefined);
+      this.codex.load(d.codex as CodexSave | undefined);
       this.map.load(d.map as MapSave | undefined);
       this.chapters.load(d.chapters as ChapterSave | undefined);
       this.delves.load(d.dungeons as Record<string, DelveState> | undefined);
@@ -439,7 +474,10 @@ export class Game {
       watch: this.watcher.serialize(),
       herald: this.herald.serialize(),
       saga: this.saga.serialize(),
-      fresco: this.fresco.events
+      fresco: this.fresco.events,
+      jobs: this.jobs.serialize(),
+      events: this.events.serialize(),
+      codex: this.codex.serialize()
     };
   }
 
@@ -509,10 +547,45 @@ export class Game {
   }
 
   /** Record something for the Living Fresco. */
-  logEvent(kind: FrescoKind, text: string) { this.fresco.add(this.sky.day, kind, text); }
+  logEvent(kind: FrescoKind, text: string) { this.fresco.add(this.sky.day, kind, text); if (kind === 'wish') this.codex.inc('wishes'); }
+
+  /** Check achievements and collection rewards against a snapshot of the game. */
+  private checkAchievements() {
+    const kills = this.creatures.kills;
+    const total = Object.values(kills).reduce((a, b) => a + b, 0);
+    const setCount = new Map<string, number>();
+    for (const st of Object.values(this.inventory.equip)) { const set = st && ITEMS[st.id]?.armor?.set; if (set) setCount.set(set, (setCount.get(set) ?? 0) + 1); }
+    const w = this.watcher.d;
+    const s: AchState = {
+      kills: total, killsBy: kills, bosses: [...this.bossesDefeated], level: this.combat.level, gold: this.gold,
+      quests: this.quests.finished().length, chapters: this.quests.finished().filter((q) => /^ch\d+$/.test(q.id)).length,
+      jobs: this.quests.finished().filter((q) => q.id.startsWith('job')).length,
+      dungeons: Object.values(this.delves.state).filter((x) => x.boss).length, uniques: this.codex.uniques,
+      setsComplete: [...setCount].filter(([id, n]) => n >= SETS[id].pieces.length).length,
+      regions: this.codex.regions.size, herbs: this.codex.count(['fiber', 'petals', 'moonpetal', 'berries', 'mushroom', 'glowcap', 'reed', 'fern', 'cactus_flesh', 'resin']),
+      minerals: this.codex.count(['coal', 'copper_ore', 'iron_ore', 'silver_ore', 'gold_ore', 'mithril_ore', 'moonstone', 'crystal_shard', 'flint']),
+      lore: this.codex.lore.size, coins: this.codex.count(COINS), deaths: Object.values(w.deaths).reduce((a, b) => a + b, 0),
+      obey: w.obey, defy: w.defy, trick: w.trick, wishes: this.codex.counters.wishes ?? 0, pet: this.herald.pet, ending: this.saga.ending,
+      villages: [...this.map.places].filter((p) => !p.startsWith('dg:') && !p.startsWith('The Pale')).length, waystones: this.map.waystones.size,
+      built: this.building.pieces.filter((p) => !p.gen).length, crafted: this.codex.counters.crafted ?? 0, playHours: this.playTime / 3600,
+      nights: this.codex.counters.nights ?? 0, biomes: this.codex.biomes.size, arenaWins: this.chapters.arenaWins, events: this.events.counts,
+      parries: w.parries, mode: this.start0.mode, elites: this.codex.counters.elites ?? 0, bestiary: Object.keys(kills).length,
+      equipped: Object.values(this.inventory.equip).filter(Boolean).length, truth: w.truth
+    };
+    for (const name of this.codex.check(s)) { this.hotbar.notify(`Achievement: ${name}`, '#e8b030'); audio.parry(); }
+    for (const [name, gold] of this.codex.collectionRewards()) { this.gold += gold; this.hotbar.notify(`Collection complete: ${name}! ${gold} gold.`, '#e8b030'); }
+  }
 
   /** Story pieces: chapters, dungeons, the saga, the fresco, the rite. */
   private special(p: Piece) {
+    if (p.id === 'lore_page') {
+      const i = Number((p.items?.[0]?.id ?? 'lore:0').split(':')[1]) % LORE.length, l = LORE[i];
+      const fresh = !this.codex.lore.has(l.id);
+      this.codex.lore.add(l.id);
+      playScene(document.getElementById('ui')!, l.title, '#d8c8a0', [l.text], () => { if (fresh) this.hotbar.notify(`Lore page added to the Codex (${this.codex.lore.size}/${LORE.length}).`, '#d8c8a0'); });
+      return;
+    }
+    if (this.events.special(p)) return;
     if (p.id === 'fresco') { this.setPaused(true); showFresco(document.getElementById('ui')!, this.fresco, this.saga.frescoViewed(), () => this.setPaused(false)); return; }
     if (p.id === 'grave_pit') { if (!this.herald.digGrave()) this.hotbar.notify('An empty grave, waiting for someone.', '#a8987c'); return; }
     if (this.chapters.special(p) || this.delves.openChest(p) || this.saga.special(p)) return;
@@ -730,6 +803,11 @@ export class Game {
       this.herald.enabled = this.story.step === 'free' && (this.saga.ending === null || this.saga.ending === 'obey');
       this.herald.update(dt);
       this.saga.update(dt);
+      this.events.update(dt);
+      this.jobs.update(this.sky.isNight);
+      if (this.sky.day !== this.lastDay) { if (this.lastDay >= 0) this.codex.inc('nights'); this.lastDay = this.sky.day; }
+      this.achTimer -= dt;
+      if (this.achTimer <= 0) { this.achTimer = 4; this.checkAchievements(); }
       this.villagers.gone = new Set(this.herald.gone);
       for (const c of this.creatures.list) if (c.def.boss && c.alerted && c.state !== 'dead' && !this.fightSeen.has(c)) { this.fightSeen.add(c); this.watcher.beginFight(); }
       if (this.herald.pet && !this.creatures.allies.some((c) => c.def.id === 'loyal_hound') && this.spawned) this.spawnPet();
@@ -762,18 +840,21 @@ export class Game {
       this.biomeTimer = 0.5;
       const p = this.player.pos;
       this.biome = this.gen.column(Math.floor(p.x), Math.floor(p.z)).biome;
+      this.codex.biomes.add(BIOMES[this.biome].name);
       const murky = this.biome === Biome.MistySwamp || this.biome === Biome.SunkenForest;
       if (murky) { U.uWaterShallow.value.setRGB(0.05, 0.07, 0.025); U.uWaterDeep.value.setRGB(0.012, 0.016, 0.006); }
       else { U.uWaterShallow.value.setRGB(0.05, 0.22, 0.2); U.uWaterDeep.value.setRGB(0.004, 0.03, 0.05); }
       const r = this.regions.at(p.x, p.z);
       if (r.id !== this.regionId) {
         this.regionId = r.id;
+        this.codex.regions.add(r.name);
         const pips = Math.min(5, Math.ceil(r.danger / 2));
         this.hud.showRegion(r.name, `${BIOMES[this.biome].name} · Danger ${'◆'.repeat(pips)}${'◇'.repeat(5 - pips)}`);
       }
     }
 
     this.sky.update(dt, cam.position);
+    this.events.tintSky();
     this.weather.update(dt, this.biome, this.sky, this.world, cam.position);
     U.uTime.value = this.elapsed;
     U.uFogHeight.value = SEA_LEVEL + 2;

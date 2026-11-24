@@ -8,7 +8,7 @@ import { iconUrl } from './icons';
 import { slotHTML } from './hotbar';
 import { buildSettings } from './settings-panel';
 
-export type MenuTab = 'inventory' | 'gear' | 'crafting' | 'map' | 'journal' | 'settings' | 'save' | 'chest';
+export type MenuTab = 'inventory' | 'gear' | 'crafting' | 'map' | 'journal' | 'codex' | 'settings' | 'save' | 'chest';
 export interface MenuHooks {
   stations(): Set<Station>;
   save(): Promise<void>;
@@ -17,6 +17,7 @@ export interface MenuHooks {
   onClose(): void;
   renderMap(host: HTMLElement): void;
   renderJournal(host: HTMLElement): void;
+  renderCodex(host: HTMLElement): void;
   /** a special action for an item in the pack (wish shards, the sealed box) */
   itemAction(id: string): { label: string; run: () => void } | null;
 }
@@ -46,7 +47,7 @@ export class Menu {
     const tabs = document.createElement('div');
     tabs.className = 'tabs';
     if (tab !== 'chest') this.chest = null;
-    const tabList: [MenuTab, string][] = [['inventory', 'Pack'], ['gear', 'Gear'], ['crafting', 'Craft'], ['map', 'Map'], ['journal', 'Journal'], ['settings', 'Settings'], ['save', 'Save']];
+    const tabList: [MenuTab, string][] = [['inventory', 'Pack'], ['gear', 'Gear'], ['crafting', 'Craft'], ['map', 'Map'], ['journal', 'Journal'], ['codex', 'Codex'], ['settings', 'Settings'], ['save', 'Save']];
     if (this.chest) tabList.unshift(['chest', 'Chest']);
     for (const [t, label] of tabList) {
       const b = document.createElement('button');
@@ -85,6 +86,7 @@ export class Menu {
     else if (this.tab === 'crafting') this.renderCrafting(b);
     else if (this.tab === 'map') this.hooks.renderMap(b);
     else if (this.tab === 'journal') this.hooks.renderJournal(b);
+    else if (this.tab === 'codex') this.hooks.renderCodex(b);
     else if (this.tab === 'settings') buildSettings(b);
     else this.renderSave(b);
   }

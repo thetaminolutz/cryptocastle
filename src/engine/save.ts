@@ -34,6 +34,9 @@ export interface SaveData {
   herald?: unknown;
   saga?: unknown;
   fresco?: unknown;
+  jobs?: unknown;
+  events?: unknown;
+  codex?: unknown;
   villagers?: Record<string, import('../entities/villagers').NPCSave>;
   shops?: Record<string, import('../game/dialogue').ShopState>;
 }

@@ -177,6 +177,9 @@ export function dungeonPieces(D: Dungeon): Piece[] {
       out.push({ id: 'cracked_wall', x: q.x0 - 1.6, y: q.y, z: cz, rot: Math.PI / 2 });
     } else if (q.boss || (!q.entry && r() < 0.45)) out.push({ id: 'loot_chest', x: q.x1 - 1.2, y: q.y, z: q.z1 - 1.2, rot: Math.PI * 0.75, items: [{ id: `chest:${D.id}:${i}`, n: q.boss ? 2 : 1 }] } as Piece);
   });
+  // one page of lore in a random ordinary room
+  const lr = D.rooms.filter((q) => !q.boss && !q.entry && !q.hidden);
+  if (lr.length) { const q = lr[Math.floor(r() * lr.length)]; out.push({ id: 'lore_page', x: q.x0 + 1.2, y: q.y, z: q.z0 + 1.2, rot: 0, items: [{ id: `lore:${D.seed % 20}`, n: 1 }] } as Piece); }
   return out.map((p) => ({ ...p, gen: true } as Piece));
 }
 

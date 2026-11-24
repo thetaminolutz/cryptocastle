@@ -4,11 +4,13 @@
 export type Place = 'campfire' | 'herald' | 'tower' | 'graveyard' | 'lab_entrance' | 'citadel' | 'arena' | 'quest_board'
   | 'village1' | 'falcon_meadow' | 'monument' | 'chapel' | 'cathedral' | 'hollow_tower' | 'errand';
 
+/** `pos` overrides `at` with a fixed point (generated quests) */
+type At = { pos?: { x: number; z: number } };
 export type Objective =
-  | { kind: 'goto'; at: Place; r: number; text: string }
-  | { kind: 'kill'; enemy: string; n: number; text: string; at?: Place; r?: number }
-  | { kind: 'collect'; item: string; n: number; text: string; at?: Place }
-  | { kind: 'flag'; flag: string; text: string; at?: Place };
+  | ({ kind: 'goto'; at?: Place; r: number; text: string } & At)
+  | ({ kind: 'kill'; enemy: string; n: number; text: string; at?: Place; r?: number } & At)
+  | ({ kind: 'collect'; item: string; n: number; text: string; at?: Place } & At)
+  | ({ kind: 'flag'; flag: string; text: string; at?: Place } & At);
 
 export interface Stage { text: string; objectives: Objective[]; }
 export interface Reward { gold?: number; xp?: number; items?: [string, number][]; }
@@ -24,6 +26,11 @@ export interface QuestDef {
   next?: string;
   /** text shown (toast) on completion */
   done?: string;
+  /** generated at runtime (saved with the game) */
+  generated?: boolean;
+  /** generated: what to spawn and where */
+  spawn?: { enemy: string; n: number; pos: { x: number; z: number }; elite?: boolean; night?: boolean; name?: string };
+  giver?: string;
 }
 
 export const QUESTS: Record<string, QuestDef> = {};

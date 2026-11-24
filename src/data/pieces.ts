@@ -6,7 +6,7 @@ export const WALL_H = 2.4;
 
 export type Snap = 'cell' | 'edge' | 'corner' | 'free';
 export type PieceCat = 'structure' | 'furniture' | 'light';
-export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim' | 'tablet' | 'rite' | 'gate' | 'board' | 'waystone' | 'stash' | 'hoard' | 'loot' | 'fresco' | 'plinth' | 'altar_judge' | 'grave';
+export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim' | 'tablet' | 'rite' | 'gate' | 'board' | 'waystone' | 'stash' | 'hoard' | 'loot' | 'fresco' | 'plinth' | 'altar_judge' | 'grave' | 'meteor' | 'caravan' | 'lore';
 
 /** Local axis-aligned collision box: [minX, minY, minZ, maxX, maxY, maxZ] (rot 0, facing -Z). */
 export type Box = [number, number, number, number, number, number];
@@ -103,6 +103,11 @@ P({ id: 'black_spire', name: 'Black Spire', cat: 'structure', snap: 'free', cost
 P({ id: 'cathedral_spire', name: 'Cathedral Spire', cat: 'structure', snap: 'free', cost: [], boxes: [[-2.4, 0, -2.4, 2.4, 22, 2.4]], top: 22, icon: 'pillar', hidden: true });
 P({ id: 'judgment_altar', name: 'Altar of Judgment', cat: 'furniture', snap: 'free', cost: [], boxes: [[-1.2, 0, -0.6, 1.2, 1.1, 0.6]], top: 1.1, use: 'altar_judge', icon: 'table', hidden: true, light: [2.6, 1.6, 0.6, 9] });
 P({ id: 'rose_window', name: 'Rose Window', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'painting', hidden: true });
+
+P({ id: 'meteor', name: 'Fallen Star', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.9, 0, -0.9, 0.9, 1.0, 0.9]], top: 1, use: 'meteor', icon: 'pot', hidden: true, light: [1.2, 1.6, 2.6, 9] });
+P({ id: 'caravan', name: 'Caravan Wagon', cat: 'furniture', snap: 'free', cost: [], boxes: [[-1.1, 0, -2, 1.1, 2.2, 2]], top: 2.2, use: 'caravan', icon: 'table', hidden: true, light: [2.4, 1.6, 0.7, 8] });
+
+P({ id: 'lore_page', name: 'Lore Page', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, use: 'lore', icon: 'painting', hidden: true, light: [1.4, 1.2, 0.6, 3] });
 
 export const CLAIM_RADIUS = 22;
 
