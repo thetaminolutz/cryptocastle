@@ -24,8 +24,7 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M12 Herald errands, profile, wish shards, Living Fresco, endings | ✅ done |
 | M13 Procedural quests, world events, achievements, Codex | ✅ done |
 | M14 Adaptive audio | ✅ done |
-| M15 Polish, balancing, tutorial hints, performance, README | next |
-| M4–M15 | see the feature bible |
+| M15 Polish, balancing, tutorial hints, performance, README | ✅ done |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
 Surface Nets and textured with procedural 128 px materials + normal maps
@@ -98,6 +97,14 @@ rumours, work (deliver items for gold), give gifts (they have favourites), rent
 a room at the inn, trade at the general store, smithy, alchemist, tailor or inn
 (prices follow reputation; shops have limited gold and restock every few days),
 or pickpocket, insult and threaten — word travels, and reputation is remembered.
+
+**Polish (M15):** contextual **tutorial hints** that appear once, the first
+time something becomes possible (moving, using things, fighting, stamina,
+wounds, night, gathering, crafting, building, gear, villages, the journal,
+waystones, dungeons, wish shards, bosses, swimming, the Codex) — switch them off
+in Settings; optional tool and weapon **durability**; boss strength scaled to
+how far from the start you meet them; leaner memory use for building pieces;
+a full save → reload → continue check.
 
 **The opening (M9):** a new journey begins at night in a moonlit clearing —
 faceless, nameless, with only a staff. An objective line (with an arrow and
@@ -225,10 +232,13 @@ the Herald's wordless whisper.
 
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera (tap an enemy to lock on), **Strike/Mine/Chop/Dig** (hold to keep swinging), **Block**,
-**Use** (appears when something is in reach: harvest, place, drink, use station),
-**Jump** (hold against a wall or tree to climb; in water: swim up), **Dodge** = roll.
-Tap a belt slot to hold it. ◐ toggles first/third person, ☰ opens the menu
-(Pack, Craft, Settings, Save).
+**Use** (appears when something is in reach: talk, open, read, harvest, travel,
+use a station), **Jump** (hold against a wall or tree to climb; in water: swim
+up), **Dodge** = roll (block just as a blow lands to parry). Hold a bow,
+crossbow or wand and Strike to shoot at the locked or nearest enemy in front.
+Tap a belt slot to hold it. ◐ toggles first/third person, ⚒ opens build mode,
+☰ opens the menu (Pack, Gear, Craft, Map, Journal, Codex, Settings, Save).
+On the map: drag to move, pinch to zoom, tap to place or remove a pin.
 Keyboard: WASD, Shift sprint, Space jump/climb, F strike (place in build mode), E use, Q dodge, 1–6 belt, B build mode, R rotate.
 
 ## Run locally
@@ -307,7 +317,20 @@ scripts/     icon generator (pixel-art PNGs, run automatically on build)
   `src/entities/player.ts`.
 - **Items, recipes, drops:** `src/data/items.ts` (`ITEMS`, `RECIPES`, `MINE`,
   `TREE_DROPS`, `PLANT_DROPS`). Icons are drawn from the item's `icon` field.
-- Items, enemies, NPCs and quests will live as data tables in `src/data/`.
+- **Weapons, armour, sets, affixes, unique items:** `src/data/gear.ts` (`GEAR`,
+  `SETS`, `AFFIXES`, `LOOT_TIERS`). A worn piece's `look` decides how it shows on
+  the hero; held-weapon models are in `heldModel()` in `src/game/interaction.ts`.
+- **Bosses:** an enemy row with a `boss` block (phases, summons, slam, drops).
+- **Quests and story chapters:** `src/data/quests.ts` (stages of goto / kill /
+  collect / flag objectives). Story events set flags with `quests.flag(name)`.
+  Generated side quests: `src/game/oddjobs.ts`.
+- **Dungeon themes:** `THEMES` in `src/world/dungeons.ts`.
+- **Achievements, lore pages, collections:** `src/data/achievements.ts`.
+- **Herald errands and wishes:** `src/game/herald.ts`; story positions in
+  `src/data/story.ts`.
+- **Music themes:** `THEMES` in `src/engine/music.ts` (scale, tempo, voices,
+  drum pattern); sound effects are methods on `audio` in `src/engine/audio.ts`.
+- **Tutorial hints:** the `HINTS` table in `src/game/hints.ts`.
 
 ## Performance notes
 
@@ -319,3 +342,13 @@ scripts/     icon generator (pixel-art PNGs, run automatically on build)
   Web Workers: one terrain and one liquid mesh per chunk.
 - If FPS stays under 45 for 5 s, the game lowers render scale, then shadows,
   then grass, then view distance, then particles (Settings → Auto quality).
+- Building pieces (yours, villages, the Citadel, dungeons) are instanced per
+  model, sized to how many of each exist, and frustum-culled; villages, dungeons
+  and story places load their pieces only when you are near.
+- Enemies and villagers are GPU-animated instances: one draw call per enemy type
+  or outfit that is actually on screen.
+- Music, ambience and effects are synthesised on the fly; the music scheduler
+  plays a few notes ahead and only while the app is in the foreground.
+- Measured in the busiest place (the Pale Citadel, Medium preset): about 280
+  draw calls and 600k triangles. Not yet measured on a real iPad — if it runs
+  hot, keep Auto quality on or pick the Low preset.

@@ -13,6 +13,8 @@ export interface Settings {
   pixelLook: boolean;     // retro nearest-neighbour upscale
   damageNumbers: boolean;
   hitSound: boolean;      // warning sound when hit (muting it is dangerous)
+  hints: boolean;         // contextual tutorial hints
+  durability: boolean;    // tools and weapons wear out
   showFps: boolean;
   autoQuality: boolean;
   particles: number;      // 0..1
@@ -39,6 +41,8 @@ const DEFAULTS: Settings = {
   pixelLook: false,
   damageNumbers: true,
   hitSound: true,
+  hints: true,
+  durability: true,
   showFps: false,
   autoQuality: true,
   masterVolume: 0.8,

@@ -17,6 +17,8 @@ const ROWS: Row[] = [
   { kind: 'toggle', key: 'pixelLook', label: 'Retro pixel look' },
   { kind: 'toggle', key: 'damageNumbers', label: 'Damage numbers' },
   { kind: 'toggle', key: 'hitSound', label: 'Warning sound when hit' },
+  { kind: 'toggle', key: 'hints', label: 'Tutorial hints' },
+  { kind: 'toggle', key: 'durability', label: 'Tool & weapon durability' },
   { kind: 'select', key: 'fpsCap', label: 'FPS cap', options: [['60', '60'], ['30', '30']] },
   { kind: 'toggle', key: 'autoQuality', label: 'Auto quality (heat / FPS)' },
   { kind: 'toggle', key: 'showFps', label: 'Show FPS counter' },

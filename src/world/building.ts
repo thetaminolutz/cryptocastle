@@ -571,14 +571,22 @@ export class Building {
   }
 
   private rebuild(player: THREE.Vector3) {
-    for (const l of [...this.real.values(), ...this.planned.values()]) l.ensure(this.pieces.length * 2 + 2);
+    // size each layer to its own pieces (thousands of village/citadel/dungeon pieces otherwise multiply per model)
+    const real = new Map<string, number>(), plan = new Map<string, number>();
+    for (const p of this.pieces) {
+      const m = p.planned ? plan : real;
+      m.set(p.id, (m.get(p.id) ?? 0) + 1);
+      if (p.id === 'door_wall') m.set('door_leaf', (m.get('door_leaf') ?? 0) + 1);
+    }
+    for (const [id, l] of this.real) l.ensure((real.get(id) ?? 0) + 2);
+    for (const [id, l] of this.planned) l.ensure((plan.get(id) ?? 0) + 2);
     for (const p of this.pieces) this.push(p.planned ? this.planned : this.real, p);
     for (const l of this.real.values()) l.shadowNear(player, 80);
   }
 
   /** Show ghost pieces (placement preview). ok=false tints red. */
   setPreview(list: Piece[], ok: boolean) {
-    for (const l of this.preview.values()) l.ensure(list.length * 2 + 2);
+    for (const [id, l] of this.preview) l.ensure(list.filter((p) => p.id === id || (id === 'door_leaf' && p.id === 'door_wall')).length + 2);
     for (const p of list) this.push(this.preview, p);
     for (const l of this.preview.values()) {
       const u = (l.material.uniforms.uGhost.value as THREE.Vector4);

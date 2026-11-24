@@ -115,7 +115,8 @@ export class Creatures {
       phaseIdx: 0, slamT: def.boss?.slam?.every ?? 0, speedMul: 1, shooting: false, rangedOn: !def.boss
     };
     if (def.scale) c.scale = def.scale * (def.boss ? 1 : 0.95 + Math.random() * 0.1);
-    if (def.boss) { c.elite = false; c.dmgMul = 1 + (danger - 1) * 0.1; c.hp = c.maxHp = def.hp * (1 + (danger - 1) * 0.12); }
+    // bosses near the start are gentler; far away they grow tougher than their table value
+    if (def.boss) { c.elite = false; c.dmgMul = 0.8 + Math.min(1.6, danger) * 0.15; c.hp = c.maxHp = def.hp * Math.min(1.3, 0.15 + danger * 0.25); }
     this.list.push(c);
     return c;
   }

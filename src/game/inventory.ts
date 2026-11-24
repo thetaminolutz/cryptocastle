@@ -1,5 +1,6 @@
 // Inventory: 6 hotbar slots + 24 backpack slots. Stacks, tool durability, crafting.
 import { ITEMS, RECIPES, Recipe, Station } from '../data/items';
+import { settings } from '../engine/settings';
 import { AFFIXES, EquipKey, slotKind } from '../data/gear';
 
 export interface Stack { id: string; n: number; dur?: number; /** weapon affix id */ affix?: string }
@@ -93,7 +94,7 @@ export class Inventory {
   /** Wear the held tool; returns true if it broke. */
   wear(amount = 1): boolean {
     const s = this.held;
-    if (!s || s.dur === undefined) return false;
+    if (!s || s.dur === undefined || !settings.values.durability) return false;
     s.dur -= amount;
     if (s.dur <= 0) { this.slots[this.selected] = null; this.changed(); return true; }
     this.changed();

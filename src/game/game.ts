@@ -60,6 +60,7 @@ import { COINS, LORE, AchState } from '../data/achievements';
 import { SETS } from '../data/gear';
 import { playScene } from '../ui/scene';
 import { Soundscape } from './soundscape';
+import { Hints } from './hints';
 import { SORCERER } from '../data/story';
 import { ENEMIES } from '../data/enemies';
 
@@ -96,6 +97,13 @@ export class Game {
   get isUnderwater() { return this.underwater; }
   private soundT = 0;
   readonly sound: Soundscape;
+  private hints!: Hints;
+  /** for hints */
+  get elapsedTime() { return this.elapsed; }
+  useVisible = false;
+  get inVillage() { return !!this.villagers.current && this.villagers.current.site.id !== 'citadel'; }
+  get dialogOpen() { return this.dialogue.isOpen || this.story.busy || this.menu.isOpen || this.creating; }
+  isWearable(id: string) { return !!ITEMS[id]?.armor; }
   readonly creatures: Creatures;
   readonly combat: Combat;
   private shake = 0;
@@ -211,7 +219,7 @@ export class Game {
         : id === 'sealed_box' ? { label: 'Open the box', run: () => this.herald.openBox() } : null
     });
     this.interaction = new Interaction(this.world, this.player, this.model, this.inventory, this.props, this.building, {
-      setAction: (l) => { this.touch.setVisible('interact', !!l && !this.build.active); if (l) this.touch.setLabel('interact', l); },
+      setAction: (l) => { this.useVisible = !!l; this.touch.setVisible('interact', !!l && !this.build.active); if (l) this.touch.setLabel('interact', l); },
       setAttack: (l) => this.touch.setLabel('attack', l),
       toast: (t, c) => this.hotbar.notify(t, c),
       openCrafting: () => { this.setPaused(true); this.menu.open('crafting'); },
@@ -383,6 +391,7 @@ export class Game {
     let pickT = 0;
     this.inventory.onAdd = (id) => { this.codex.seen.add(id); const now = performance.now(); if (this.spawned && now - pickT > 150) { pickT = now; audio.pickup(); } };
     this.sound = new Soundscape(this);
+    this.hints = new Hints(ui, this);
     const craft = this.inventory.craft.bind(this.inventory);
     this.inventory.craft = (r, st) => { const ok = craft(r, st); if (ok) { this.codex.inc('crafted'); audio.craft(); } return ok; };
     this.touch.onTap = (x, y) => {
@@ -828,6 +837,7 @@ export class Game {
       this.soundT -= dt;
       if (this.soundT <= 0) { this.soundT = 0.5; this.refreshSoundState(); }
       this.sound.update(dt);
+      this.hints.update(dt);
       this.jobs.update(this.sky.isNight);
       if (this.sky.day !== this.lastDay) { if (this.lastDay >= 0) this.codex.inc('nights'); this.lastDay = this.sky.day; }
       this.achTimer -= dt;

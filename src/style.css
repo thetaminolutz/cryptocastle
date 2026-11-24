@@ -353,3 +353,9 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .codex-icon img { width: 48px; height: 48px; display: block; margin: 0 auto 2px; }
 .codex-icon.unknown img { filter: brightness(0) opacity(.5); }
 .codex-list { color: #c8b890; line-height: 1.6; }
+
+/* ---- tutorial hints */
+.hint-card { position: absolute; left: 50%; top: calc(64px + var(--sat)); transform: translate(-50%, -12px); width: min(520px, 80vw); background: rgba(20,14,10,.92); border: 2px solid var(--gold); color: var(--ink); padding: 10px 14px; font-size: 14px; line-height: 1.45; opacity: 0; pointer-events: none; transition: opacity .35s, transform .35s; z-index: 5; }
+.hint-card.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.hint-card b { display: block; color: var(--gold); letter-spacing: 2px; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; }
+.hint-card small { display: block; margin-top: 4px; color: #7a6a58; font-size: 11px; }
