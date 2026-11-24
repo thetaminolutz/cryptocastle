@@ -1,3 +1,4 @@
+import { audio } from '../engine/audio';
 // Build mode: choose a piece or blueprint, aim, see a ghost preview (green = ok,
 // red = blocked / missing materials), place (hold to repeat), rotate, remove with a
 // full refund, undo the last 20 actions, and build planned blueprint pieces.
@@ -200,6 +201,7 @@ export class BuildMode {
     if (this.cat === 'plans') {
       if (!this.ok) { this.hooks.toast('Something is in the way.', '#e08070'); return; }
       this.building.add(this.candidates.map((p) => ({ ...p })));
+      audio.place();
       this.lastKey = key;
       this.hooks.toast('Plan laid out. Gather materials, then tap "Build plans".', '#c8d8ff');
       return;
@@ -213,6 +215,7 @@ export class BuildMode {
     }
     for (const [i, k] of cost) this.inv.remove(i, k);
     this.building.add([{ ...p }]);
+    audio.place();
     this.lastKey = key;
   }
 

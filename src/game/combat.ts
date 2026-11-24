@@ -146,6 +146,8 @@ export class Combat {
     }
     if (hit) {
       audio.impact(heavy);
+      const lh = this.lastHit && 'def' in this.lastHit ? this.lastHit.def.id : '';
+      audio.hit(/skeleton|wight|lich/.test(lh) ? 'bone' : /knight|orc|champion|warden|hollow|golem|colossus/.test(lh) ? 'metal' : /gargoyle|crab|scorpion|crawler/.test(lh) ? 'stone' : 'flesh');
       this.hooks.shake(heavy ? 0.25 : 0.1);
       if (held && ITEMS[held].tool?.durability) this.inv.wear(1);
     } else audio.whoosh();
@@ -183,7 +185,7 @@ export class Combat {
     if (target) p.yaw = Math.atan2(-dir.x, -dir.z);
     const kind = r.ammo ? (w.speed < 0.7 ? 'bolt' : 'arrow') : 'spell';
     this.shoot?.(from, dir, r.speed * (heavy ? 1.2 : 1), w.dmg * mult * (1 + this.perks.ranged) * (heavy ? 1.3 : 1), w.type, kind);
-    audio.whoosh();
+    if (kind === 'arrow') audio.bow(); else if (kind === 'bolt') audio.crossbow(); else audio.spell(w.type === 'ice' ? 'ice' : w.type === 'holy' ? 'holy' : w.type === 'shadow' ? 'shadow' : 'fire');
     p.stamina = Math.max(0, p.stamina - w.stamina * (heavy ? 1.8 : 1));
     return true;
   }

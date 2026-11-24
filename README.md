@@ -23,7 +23,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M11 Remaining enemies, bosses, dungeons, unique items, armour sets | ✅ done |
 | M12 Herald errands, profile, wish shards, Living Fresco, endings | ✅ done |
 | M13 Procedural quests, world events, achievements, Codex | ✅ done |
-| M14 Adaptive audio | next |
+| M14 Adaptive audio | ✅ done |
+| M15 Polish, balancing, tutorial hints, performance, README | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -202,6 +203,25 @@ rolled at dusk and dawn: a **blood moon** (red sky, bolder monsters, more elites
 defeat enemies, with weaknesses and resistances), **collections** (herbarium,
 minerals, 12 ancient coins, unique items, regions and biomes — completing a set
 pays out), 20 **lore pages** hidden in dungeons, and **62 achievements**.
+
+**Audio (M14), all synthesised in code:** a mixer (master, music, effects,
+ambience — each with its own slider) with a compressor and a reverb send; a
+**generative music engine** that never repeats exactly and cross-fades between
+themes: calm exploration themes per biome (forest flute, meadow plucks, pine
+choirs, swamp bells and frame drums, desert lute, snowy bells, ashland horns,
+mushroom bells, coastal flute, moor horns), night, **tense** combat music, a
+heavier **boss** theme, **victory** fanfares after fights, the Herald's eerie
+theme, lively **tavern** jigs in inns, dungeon drones with heartbeat drums, the
+Citadel, and the opening's heartbeat drums with distant horns. **Ambience** beds
+follow the world: wind, rain, rivers and lakes, birdsong by day, crickets at
+night, dripping caves, crackling fires, the murmur of a crowded inn, muffled
+sound underwater. **Effects:** footsteps per surface (grass, dirt, stone, wood,
+snow, sand, water), swings and hits that sound different on flesh, bone, metal
+and stone, blocks, parries, bow and crossbow shots, fire / ice / holy / shadow
+spells, mining, chopping, digging, harvesting, doors, coins, pickups, crafting,
+building, eating, level-ups, achievements, hoofbeats, splashes, monsters that
+announce themselves (beasts, insects, the undead, birds, spirits, people) and
+the Herald's wordless whisper.
 
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera (tap an enemy to lock on), **Strike/Mine/Chop/Dig** (hold to keep swinging), **Block**,

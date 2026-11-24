@@ -38,6 +38,7 @@ function startGame(slot = 0, data: SaveData | null = null, mode: 'wanderer' | 'o
     (window as unknown as { __game: Game; __input: typeof input }).__game = game;
     (window as unknown as { __input: typeof input }).__input = input;
     (window as unknown as { __enemies: typeof ENEMIES }).__enemies = ENEMIES;
+    (window as unknown as { __audio: typeof audio }).__audio = audio;
     setTimeout(() => loading.remove(), 1200);
   }, 50);
 }

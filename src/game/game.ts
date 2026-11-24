@@ -59,6 +59,7 @@ import { Codex, CodexSave } from './codex';
 import { COINS, LORE, AchState } from '../data/achievements';
 import { SETS } from '../data/gear';
 import { playScene } from '../ui/scene';
+import { Soundscape } from './soundscape';
 import { SORCERER } from '../data/story';
 import { ENEMIES } from '../data/enemies';
 
@@ -88,7 +89,13 @@ export class Game {
   private acc = 0;
   private spawned = false;
   private elapsed = 0;
-  private gold = 0;
+  gold = 0;
+  /** sound state, refreshed twice a second */
+  lastKillT = 99; inTavern = false; waterDistance = 99; nearFire = 0;
+  get heraldNear() { return this.herald.present; }
+  get isUnderwater() { return this.underwater; }
+  private soundT = 0;
+  readonly sound: Soundscape;
   readonly creatures: Creatures;
   readonly combat: Combat;
   private shake = 0;
@@ -229,7 +236,7 @@ export class Game {
       toast: (t, c) => this.hotbar.notify(t, c),
       addGold: (n) => { this.gold += n; },
       shake: (a) => { this.shake = Math.max(this.shake, a); },
-      onLevel: (lv) => { this.hotbar.notify(`You're a ${levelWord(lv)} now.`, '#f0d070'); audio.parry(); if (lv % 5 === 0) this.logEvent('level', `Became a ${levelWord(lv)}`); }
+      onLevel: (lv) => { this.hotbar.notify(`You're a ${levelWord(lv)} now.`, '#f0d070'); audio.levelUp(); if (lv % 5 === 0) this.logEvent('level', `Became a ${levelWord(lv)}`); }
     });
     this.interaction.combat = this.combat;
     this.projectiles = new Projectiles(this.world, this.creatures, this.player, {
@@ -311,7 +318,7 @@ export class Game {
       toast: (t, c) => this.hotbar.notify(t, c), addGold: (n) => { this.gold += Math.round(n * this.combat.perks.gold); },
       day: () => this.sky.day, bossDead: () => false, log: (t) => this.logEvent('dungeon', t)
     });
-    this.creatures.onDeath = (c) => { if (c.elite) this.codex.inc('elites'); if (!c.ally && Math.random() < 0.035) { const coin = COINS[Math.floor(Math.random() * COINS.length)]; if (this.inventory.add(coin, 1) === 0) this.hotbar.notify(`An old coin glints in the dirt: ${ITEMS[coin].name}.`, '#d8b050'); } this.quests.onKill(c.def.id, c.pos); if (c.def.boss) this.bossDefeated(c); if (c.elite && Math.random() < 0.1) { if (this.inventory.add('wish_shard', 1) === 0) this.hotbar.notify('A wish shard glows among the remains.', '#40e070'); } };
+    this.creatures.onDeath = (c) => { this.lastKillT = 0; audio.death(); if (c.elite) this.codex.inc('elites'); if (!c.ally && Math.random() < 0.035) { const coin = COINS[Math.floor(Math.random() * COINS.length)]; if (this.inventory.add(coin, 1) === 0) this.hotbar.notify(`An old coin glints in the dirt: ${ITEMS[coin].name}.`, '#d8b050'); } this.quests.onKill(c.def.id, c.pos); if (c.def.boss) this.bossDefeated(c); if (c.elite && Math.random() < 0.1) { if (this.inventory.add('wish_shard', 1) === 0) this.hotbar.notify('A wish shard glows among the remains.', '#40e070'); } };
     this.watcher = new Watcher(this.player, this.creatures, () => this.regions.at(this.player.pos.x, this.player.pos.z).name);
     this.combat.onEvent = (e, kind) => this.watcher.event(e, kind);
     const remember = this.villagers.remember.bind(this.villagers);
@@ -373,9 +380,11 @@ export class Game {
       pause: (p) => this.setPaused(p)
     });
     this.scene.add(this.events.group);
-    this.inventory.onAdd = (id) => this.codex.seen.add(id);
+    let pickT = 0;
+    this.inventory.onAdd = (id) => { this.codex.seen.add(id); const now = performance.now(); if (this.spawned && now - pickT > 150) { pickT = now; audio.pickup(); } };
+    this.sound = new Soundscape(this);
     const craft = this.inventory.craft.bind(this.inventory);
-    this.inventory.craft = (r, st) => { const ok = craft(r, st); if (ok) this.codex.inc('crafted'); return ok; };
+    this.inventory.craft = (r, st) => { const ok = craft(r, st); if (ok) { this.codex.inc('crafted'); audio.craft(); } return ok; };
     this.touch.onTap = (x, y) => {
       if (this.build.active) return;
       const ndc = new THREE.Vector2((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
@@ -549,6 +558,17 @@ export class Game {
   /** Record something for the Living Fresco. */
   logEvent(kind: FrescoKind, text: string) { this.fresco.add(this.sky.day, kind, text); if (kind === 'wish') this.codex.inc('wishes'); }
 
+  private refreshSoundState() {
+    const p = this.player.pos;
+    const v = this.villagers.current;
+    this.inTavern = !!v && v.layout.buildings.some((b) => b.kind === 'tavern' && Math.hypot(b.inside.x - p.x, b.inside.z - p.z) < 4.6 && Math.abs(b.inside.y - p.y) < 2);
+    let wd = 99;
+    for (const r of [3, 8, 14, 20]) { for (let a = 0; a < 8; a++) { const x = p.x + Math.cos(a * 0.785) * r, z = p.z + Math.sin(a * 0.785) * r; const c = this.gen.column(x, z); if (c.liquidLevel > c.height + 0.2 && c.liquid === 5) { wd = r; break; } } if (wd < 99) break; }
+    this.waterDistance = wd;
+    const fire = this.props.list.some((q) => q.type === 'campfire' && Math.hypot(q.x - p.x, q.z - p.z) < 7) || this.building.pieces.some((q) => (q.id === 'fireplace' || q.id === 'forge') && Math.abs(q.x - p.x) < 6 && Math.abs(q.z - p.z) < 6);
+    this.nearFire = fire ? 1 : 0;
+  }
+
   /** Check achievements and collection rewards against a snapshot of the game. */
   private checkAchievements() {
     const kills = this.creatures.kills;
@@ -572,7 +592,7 @@ export class Game {
       parries: w.parries, mode: this.start0.mode, elites: this.codex.counters.elites ?? 0, bestiary: Object.keys(kills).length,
       equipped: Object.values(this.inventory.equip).filter(Boolean).length, truth: w.truth
     };
-    for (const name of this.codex.check(s)) { this.hotbar.notify(`Achievement: ${name}`, '#e8b030'); audio.parry(); }
+    for (const name of this.codex.check(s)) { this.hotbar.notify(`Achievement: ${name}`, '#e8b030'); audio.achievement(); }
     for (const [name, gold] of this.codex.collectionRewards()) { this.gold += gold; this.hotbar.notify(`Collection complete: ${name}! ${gold} gold.`, '#e8b030'); }
   }
 
@@ -804,6 +824,10 @@ export class Game {
       this.herald.update(dt);
       this.saga.update(dt);
       this.events.update(dt);
+      this.lastKillT += dt;
+      this.soundT -= dt;
+      if (this.soundT <= 0) { this.soundT = 0.5; this.refreshSoundState(); }
+      this.sound.update(dt);
       this.jobs.update(this.sky.isNight);
       if (this.sky.day !== this.lastDay) { if (this.lastDay >= 0) this.codex.inc('nights'); this.lastDay = this.sky.day; }
       this.achTimer -= dt;

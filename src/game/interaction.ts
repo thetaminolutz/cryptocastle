@@ -2,6 +2,7 @@
 // harvest plants, place stations, eat, drink. Also builds the 3D model of the item
 // in the hero's hand.
 import { METAL_ENV } from '../entities/hero';
+import { audio } from '../engine/audio';
 import * as THREE from 'three';
 import { input } from '../engine/input';
 import { ITEMS, MINE, PLANT_DROPS, TREE_DROPS, ToolKind, weaponOf } from '../data/items';
@@ -313,6 +314,7 @@ export class Interaction {
     const tool = this.tool();
     if (!t) return;
     if (t.type === 'tree') {
+      audio.chop();
       const def = TREE_DROPS[t.tree.kind];
       const key = `${t.tree.key}:${t.tree.index}`;
       const dmg = tool?.kind === 'axe' ? tool.power * 1.2 : tool?.kind === 'pickaxe' ? 0.5 : 0.3;
@@ -336,6 +338,7 @@ export class Interaction {
       return;
     }
     const kind = tool?.kind;
+    { const hard = MINE[t.material] && !MINE[t.material].soft; if (hard) audio.mine(MINE[t.material].item.endsWith('ore') || MINE[t.material].item === 'moonstone'); else audio.dig(); }
     const r = kind === 'shovel' ? 1.25 : kind === 'pickaxe' ? 1.05 : 0.85;
     const centre = t.point.clone().addScaledVector(t.normal, -0.25);
     const removed = this.world.dig(centre.x, centre.y, centre.z, r, 1, (m) => this.digFactor(m));
@@ -372,6 +375,7 @@ export class Interaction {
     const s = this.inv.held;
     if (!s) return;
     const food = ITEMS[s.id].food!;
+    audio.eat();
     this.player.life = Math.min(this.player.maxLife, this.player.life + food.heal);
     if (food.stamina) this.player.stamina = Math.min(100, this.player.stamina + food.stamina);
     if (food.cures) { this.combat?.cure(food.cures); this.ui.toast(food.cures === 'bleed' ? 'The bleeding stops.' : 'The poison fades.', '#a8e0a0'); }
@@ -415,7 +419,7 @@ export class Interaction {
         };
       } else if (piece) {
         const use = PIECES[piece.id].use;
-        if (use === 'door') { label = piece.open ? 'Close door' : 'Open door'; this.action = () => this.building.toggleDoor(piece); }
+        if (use === 'door') { label = piece.open ? 'Close door' : 'Open door'; this.action = () => { audio.door(!piece.open); this.building.toggleDoor(piece); }; }
         else if (use === 'bed') { label = 'Sleep'; this.action = () => this.ui.sleep(piece); }
         else if (use === 'chest') { label = 'Open chest'; this.action = () => this.ui.openChest(piece); }
         else if (use === 'sit') { label = this.player.sitting ? 'Stand up' : 'Sit'; this.action = () => { this.player.sitting = !this.player.sitting; if (this.player.sitting) { this.player.pos.set(piece.x, piece.y + 0.05, piece.z); this.player.yaw = piece.rot + Math.PI; } }; }
@@ -444,6 +448,7 @@ export class Interaction {
           this.harvestJob = () => {
             if (this.world.isPlantRemoved(plant.key, plant.index)) return;
             this.world.removePlant(plant.key, plant.index);
+            audio.harvest();
             const sickle = this.tool()?.kind === 'sickle' || this.tool()?.kind === 'knife';
             this.give(d.drops, (sickle ? 1.6 : 1) * this.herbMul);
             if (sickle) this.inv.wear(1);

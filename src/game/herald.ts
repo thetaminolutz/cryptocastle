@@ -69,6 +69,8 @@ export class Herald {
   }
   serialize(): HeraldSave { return { boons: this.boons, errandsDone: this.errandsDone, errand: this.errand, lastErrandDay: this.lastErrandDay, gone: this.gone, pet: this.pet, healed: this.healed }; }
 
+  /** he is on screen */
+  get present() { return this.actor.visible; }
   get busy() { return (!!this.ride && !this.ride.leave) || sceneOpen(); }
 
   // ---------------------------------------------------------------- riding in and out
