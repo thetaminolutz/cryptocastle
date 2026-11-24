@@ -49,6 +49,12 @@ import { renderJournal } from '../ui/journal';
 import { Projectiles } from './projectiles';
 import { gearTotals, wornLook } from './equipment';
 import { Delves, DelveState } from './delves';
+import { Watcher, WatchSave } from './watcher';
+import { Herald, HeraldSave } from './herald';
+import { Saga, SagaSave, Ending } from './saga';
+import { FrescoLog, FrescoEvent, FrescoKind, showFresco } from './fresco';
+import { SORCERER } from '../data/story';
+import { ENEMIES } from '../data/enemies';
 
 const SPAWN = { x: 0.5, z: 0.5 };
 
@@ -114,6 +120,11 @@ export class Game {
   private gearKey = '';
   readonly bossesDefeated = new Set<string>();
   readonly delves: Delves;
+  readonly watcher: Watcher;
+  readonly herald: Herald;
+  readonly saga: Saga;
+  readonly fresco = new FrescoLog();
+  private fightSeen = new Set<object>();
   private questTimer = 0;
   traits!: Traits;
   private creating = false;
@@ -176,14 +187,16 @@ export class Game {
       renderMap: (host) => this.map.render(host, () => this.mapMarkers(), {
         travel: this.travelMode ? (id, label) => this.travel(id, label) : undefined
       }),
-      renderJournal: (host) => renderJournal(host, this.quests, () => {})
+      renderJournal: (host) => renderJournal(host, this.quests, () => {}),
+      itemAction: (id) => id === 'wish_shard' ? { label: 'Call the Herald', run: () => this.herald.wish() }
+        : id === 'sealed_box' ? { label: 'Open the box', run: () => this.herald.openBox() } : null
     });
     this.interaction = new Interaction(this.world, this.player, this.model, this.inventory, this.props, this.building, {
       setAction: (l) => { this.touch.setVisible('interact', !!l && !this.build.active); if (l) this.touch.setLabel('interact', l); },
       setAttack: (l) => this.touch.setLabel('attack', l),
       toast: (t, c) => this.hotbar.notify(t, c),
       openCrafting: () => { this.setPaused(true); this.menu.open('crafting'); },
-      special: (p) => { if (!this.chapters.special(p) && !this.delves.openChest(p)) this.story.useSpecial(p); },
+      special: (p) => this.special(p),
       openChest: (p) => { if (p.gen) { this.hotbar.notify('This chest belongs to someone else.', '#e08070'); return; } if (p.items) { this.setPaused(true); this.menu.openChest(p.items); } },
       sleep: (p) => {
         if (p.gen && !(this.rentedBed && Math.hypot(this.rentedBed.x - p.x, this.rentedBed.z - p.z) < 1.5)) { this.hotbar.notify('This bed is not yours. Rent a room from the innkeeper.', '#e08070'); return; }
@@ -204,7 +217,7 @@ export class Game {
       toast: (t, c) => this.hotbar.notify(t, c),
       addGold: (n) => { this.gold += n; },
       shake: (a) => { this.shake = Math.max(this.shake, a); },
-      onLevel: (lv) => { this.hotbar.notify(`You're a ${levelWord(lv)} now.`, '#f0d070'); audio.parry(); }
+      onLevel: (lv) => { this.hotbar.notify(`You're a ${levelWord(lv)} now.`, '#f0d070'); audio.parry(); if (lv % 5 === 0) this.logEvent('level', `Became a ${levelWord(lv)}`); }
     });
     this.interaction.combat = this.combat;
     this.projectiles = new Projectiles(this.world, this.creatures, this.player, {
@@ -231,7 +244,12 @@ export class Game {
       onOpen: () => { this.touch.setVisible('interact', false); },
       onClose: () => {},
       priceMul: () => this.traits?.priceMul ?? 1,
-      extraOptions: (n) => this.chapters.dialogueOptions(n, () => this.dialogue.close())
+      extraOptions: (n) => {
+        const v = this.villagers.villageOf(n);
+        const out = [...this.chapters.dialogueOptions(n, () => this.dialogue.close()), ...this.herald.dialogueOptions(n.name, v.site.name, n.job, n.rep, () => this.dialogue.close())];
+        if (n.job === 'guard') { const a = this.saga.allyOption(n.name.split(' ')[0], v.site.id, v.site.name, n.rep); if (a) out.push([a[0], () => { this.dialogue.close(); a[1](); }]); }
+        return out;
+      }
     });
     this.villagers.onEnterVillage = (v) => {
       this.map.places.add(`${v.site.name}@${Math.round(v.site.x)},${Math.round(v.site.z)}`);
@@ -239,7 +257,7 @@ export class Game {
       void this.save();
     };
     this.interaction.extra = () => {
-      if (this.story.nearStranger() && !this.story.busy) return { label: 'Speak to the Stranger', run: () => this.story.talkStranger() };
+      if (this.story.nearStranger() && !this.story.busy) return this.story.strangerBack ? { label: 'Ask about the fresco', run: () => this.saga.strangerTruth_() } : { label: 'Speak to the Stranger', run: () => this.story.talkStranger() };
       const lp = this.lostPack;
       if (!lp || this.player.pos.distanceTo(new THREE.Vector3(lp.x, lp.y, lp.z)) > 2.5) {
         const npc = this.dialogue.isOpen ? null : this.villagers.talkable(this.player.pos, this.player.yaw);
@@ -259,7 +277,7 @@ export class Game {
       toast: (t, c) => this.hotbar.notify(t, c),
       day: () => this.sky.day,
       onStage: () => {},
-      onComplete: () => { void this.save(); }
+      onComplete: (q) => { if (q.chapter) this.logEvent('quest', q.title); void this.save(); }
     });
     this.chapters = new Chapters(ui, this.gen, this.world, this.building, this.player, this.creatures, this.quests, this.map, {
       toast: (t, c) => this.hotbar.notify(t, c),
@@ -272,9 +290,17 @@ export class Game {
     });
     this.delves = new Delves(this.gen, this.world, this.building, this.player, this.creatures, this.map, this.inventory, {
       toast: (t, c) => this.hotbar.notify(t, c), addGold: (n) => { this.gold += Math.round(n * this.combat.perks.gold); },
-      day: () => this.sky.day, bossDead: () => false
+      day: () => this.sky.day, bossDead: () => false, log: (t) => this.logEvent('dungeon', t)
     });
-    this.creatures.onDeath = (c) => { this.quests.onKill(c.def.id, c.pos); if (c.def.boss) this.bossDefeated(c); };
+    this.creatures.onDeath = (c) => { this.quests.onKill(c.def.id, c.pos); if (c.def.boss) this.bossDefeated(c); if (c.elite && Math.random() < 0.1) { if (this.inventory.add('wish_shard', 1) === 0) this.hotbar.notify('A wish shard glows among the remains.', '#40e070'); } };
+    this.watcher = new Watcher(this.player, this.creatures, () => this.regions.at(this.player.pos.x, this.player.pos.z).name);
+    this.combat.onEvent = (e, kind) => this.watcher.event(e, kind);
+    const remember = this.villagers.remember.bind(this.villagers);
+    this.villagers.remember = (n, what, delta, spread) => {
+      remember(n, what, delta, spread);
+      const first = n.name.split(' ')[0];
+      if (delta > 0) this.watcher.inc('kind', first); else if (delta < 0) this.watcher.inc('kind', '-' + first);
+    };
     this.story = new Story(ui, this.world, this.building, this.player, this.creatures, this.props, {
       toast: (t, c) => this.hotbar.notify(t, c),
       objective: (t, at) => this.hud.setObjective(t, at, this.player.pos, this.rig.yaw),
@@ -293,6 +319,31 @@ export class Game {
       flag: (f) => this.quests.flag(f)
     });
     this.scene.add(this.story.group);
+    this.herald = new Herald(ui, this.world, this.player, this.creatures, this.quests, this.watcher, this.inventory, this.combat, {
+      name: () => this.story.profile.name,
+      gold: () => this.gold, addGold: (n) => { this.gold = Math.max(0, this.gold + n); },
+      day: () => this.sky.day, hours: () => this.sky.hours,
+      toast: (t, c) => this.hotbar.notify(t, c),
+      log: (k, t) => this.logEvent(k, t),
+      give: (id, n) => this.inventory.add(id, n) === 0,
+      levelUp: () => { this.combat.gainXp(Math.max(1, xpForLevel(this.combat.level + 1) - this.combat.xp)); },
+      levelDown: () => { if (this.combat.level > 1) { this.combat.level--; this.combat.xp = xpForLevel(this.combat.level); this.applyProfile(); } },
+      revealMap: (r) => this.map.reveal(this.player.pos.x, this.player.pos.z, r),
+      spawnPet: () => this.spawnPet(),
+      nearestDungeon: () => { const p = this.player.pos; const ds = this.gen.dungeonsNear(p.x, p.z, 1300).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z)); const d = ds[0]; return d ? { x: d.entrance.x, z: d.entrance.z, name: d.name } : null; },
+      villageWithMerchant: () => { const v = this.nearestVillageSite(); if (!v) return null; const m = this.villagers.all().find((n) => n.village === v.id && n.job === 'merchant'); return { x: v.x, z: v.z, name: v.name, merchant: m?.name ?? 'the merchant' }; },
+      nearestVillage: () => { const v = this.nearestVillageSite(); return v ? { x: v.x, z: v.z, name: v.name } : null; },
+      applyProfile: () => this.applyProfile()
+    });
+    this.scene.add(this.herald.group);
+    this.saga = new Saga(ui, this.gen, this.world, this.building, this.player, this.creatures, this.quests, this.herald, this.watcher, {
+      toast: (t, c) => this.hotbar.notify(t, c),
+      log: (k, t) => this.logEvent(k, t),
+      give: (id, n) => this.inventory.add(id, n) === 0,
+      showStranger: (on) => { this.story.strangerBack = on; },
+      endingScreen: (e) => this.endingScreen(e)
+    });
+    this.chapters.extraPlace = (p) => this.saga.place(p);
     this.touch.onTap = (x, y) => {
       if (this.build.active) return;
       const ndc = new THREE.Vector2((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
@@ -321,6 +372,10 @@ export class Game {
       this.chapters.load(d.chapters as ChapterSave | undefined);
       this.delves.load(d.dungeons as Record<string, DelveState> | undefined);
       for (const b of d.bosses ?? []) this.bossesDefeated.add(b);
+      this.watcher.load(d.watch as WatchSave | undefined);
+      this.herald.load(d.herald as HeraldSave | undefined);
+      this.saga.load(d.saga as SagaSave | undefined);
+      this.fresco.load(d.fresco as FrescoEvent[] | undefined);
       if (!d.quests) { // saves from before the quest log
         this.quests.start('ch1', true);
         if (this.story.step === 'free') for (const f of ['met_stranger', 'met_herald', 'rite_done']) this.quests.flag(f);
@@ -380,7 +435,11 @@ export class Game {
       map: this.map.serialize(),
       chapters: this.chapters.serialize(),
       dungeons: this.delves.serialize(),
-      bosses: [...this.bossesDefeated]
+      bosses: [...this.bossesDefeated],
+      watch: this.watcher.serialize(),
+      herald: this.herald.serialize(),
+      saga: this.saga.serialize(),
+      fresco: this.fresco.events
     };
   }
 
@@ -406,6 +465,8 @@ export class Game {
     if (this.dying) return;
     this.dying = true;
     this.chapters.onPlayerDeath();
+    this.watcher.inc('deaths', cause);
+    this.logEvent('death', `Died of ${cause}`);
     this.combat.status.clear();
     this.combat.lock = null;
     if (this.start0.mode === 'onelife') {
@@ -442,6 +503,51 @@ export class Game {
     audio.parry();
     this.combat.gainXp(0);
     this.bossesDefeated.add(c.def.id);
+    if (this.inventory.add('wish_shard', 1) === 0) this.hotbar.notify('A wish shard glows in the remains.', '#40e070');
+    if (c.def.id === 'hollow_king') this.saga.kingDefeated();
+    else setTimeout(() => this.herald.judge(c), 3500);
+  }
+
+  /** Record something for the Living Fresco. */
+  logEvent(kind: FrescoKind, text: string) { this.fresco.add(this.sky.day, kind, text); }
+
+  /** Story pieces: chapters, dungeons, the saga, the fresco, the rite. */
+  private special(p: Piece) {
+    if (p.id === 'fresco') { this.setPaused(true); showFresco(document.getElementById('ui')!, this.fresco, this.saga.frescoViewed(), () => this.setPaused(false)); return; }
+    if (p.id === 'grave_pit') { if (!this.herald.digGrave()) this.hotbar.notify('An empty grave, waiting for someone.', '#a8987c'); return; }
+    if (this.chapters.special(p) || this.delves.openChest(p) || this.saga.special(p)) return;
+    this.story.useSpecial(p);
+  }
+
+  private spawnPet() {
+    const p = this.player.pos;
+    const x = p.x + 1.5, z = p.z + 1.5;
+    if (!this.world.isLoaded(x, z)) return;
+    const c = this.creatures.spawn(ENEMIES.loyal_hound, new THREE.Vector3(x, this.world.groundY(x, z), z), 1 + this.combat.level * 0.15, 0);
+    c.ally = true; c.elite = false; c.state = 'idle';
+  }
+
+  private nearestVillageSite() {
+    const p = this.player.pos;
+    let best: import('../world/villages').VillageSite | null = null, bd = Infinity;
+    for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) {
+      const v = this.gen.village((Math.floor(p.x / 560) + i + 0.5) * 560, (Math.floor(p.z / 560) + j + 0.5) * 560);
+      if (v && v.id !== 'citadel') { const d = Math.hypot(v.x - p.x, v.z - p.z); if (d < bd) { bd = d; best = v; } }
+    }
+    return best;
+  }
+
+  /** The end of the main story. */
+  private endingScreen(e: Ending) {
+    const name = this.story.profile.name;
+    const text: Record<Ending, [string, string]> = {
+      obey: ['THE HERALD’S CROWN', `${name} lifted the hollow crown and set it on their head. It fit. The Herald smiled, and for the first time his smile reached his amber eyes — which were now also ${name}’s eyes. Somewhere, a new faceless one is waking in a moonlit clearing. You will be waiting for them.`],
+      resist: ['THE BROKEN OATH', `${name} brought the crown down on the black stone until it split. The Herald did not shout. He only sighed, and his horse walked away into the dark, and the hoofbeats grew quieter for a long time. The rules are broken. The world is yours to wander — and it is a little brighter.`],
+      truth: ['THE SORCERER’S WILL', `${name} said the name aloud: ${SORCERER}. The Herald stopped. Across the land, by a fire that had burned for three hundred years, the Ashen Stranger stood up. Two halves of one will met at last, and with a sound like a long breath let out, both were gone. You remember something, then — a face, your own, and a name that is not one the gnome gave you.`]
+    };
+    const [title, body] = text[e];
+    void this.save();
+    setTimeout(() => showDeath(title, `${body}\n\nThe story is over. The world stays open: keep exploring, finish your errands, clear the dungeons — and see what the Fresco paints next.`, 'Continue your journey', () => { this.setPaused(false); }), 600);
   }
 
   /** An enemy releases its ranged attack: aim at the player with a little lead. */
@@ -521,6 +627,7 @@ export class Game {
       fade.style.opacity = '0';
       setTimeout(() => fade.remove(), 1300);
       this.hud.showRegion(this.story.profile.name, 'The First Rite is done');
+      this.logEvent('rite', `${this.story.profile.name} receives a face`);
       void this.save();
     }, 1600);
   }
@@ -619,6 +726,13 @@ export class Game {
       this.projectiles.update(dt);
       this.chapters.update(dt);
       this.delves.update(dt);
+      this.watcher.update(dt, this.sky.isNight);
+      this.herald.enabled = this.story.step === 'free' && (this.saga.ending === null || this.saga.ending === 'obey');
+      this.herald.update(dt);
+      this.saga.update(dt);
+      this.villagers.gone = new Set(this.herald.gone);
+      for (const c of this.creatures.list) if (c.def.boss && c.alerted && c.state !== 'dead' && !this.fightSeen.has(c)) { this.fightSeen.add(c); this.watcher.beginFight(); }
+      if (this.herald.pet && !this.creatures.allies.some((c) => c.def.id === 'loyal_hound') && this.spawned) this.spawnPet();
       this.questTimer -= dt;
       if (this.questTimer <= 0) {
         this.questTimer = 0.5;

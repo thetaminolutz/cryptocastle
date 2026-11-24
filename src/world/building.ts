@@ -124,6 +124,72 @@ const MODELS: Record<string, () => THREE.BufferGeometry> = {
     for (const s of [-1, 1]) { const m = new THREE.SphereGeometry(0.5, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); m.scale(0.6, 0.5, 2); m.translate(s * 0.9, 0, 0); b.add(m, { layer: 'dirt' }); }
     return b.build();
   },
+  fresco: () => {
+    const b = new GeoBuilder();
+    box(b, 2.7, 1.45, 0.04, 0, 1.55, -0.02, 'white', [0.78, 0.6, 0.38], 0, [1, 1]);
+    // painted panels: figures and a rider in soot and ochre
+    for (let i = 0; i < 4; i++) {
+      const x = -0.98 + i * 0.65;
+      box(b, 0.58, 1.2, 0.01, x, 1.55, -0.045, 'white', i % 2 ? [0.62, 0.42, 0.24] : [0.55, 0.62, 0.66]);
+      box(b, 0.06, 0.32, 0.01, x - 0.1, 1.4, -0.055, 'white', [0.14, 0.1, 0.08]);
+      box(b, 0.05, 0.05, 0.01, x - 0.1, 1.6, -0.055, 'white', [0.14, 0.1, 0.08]);
+      if (i % 2) box(b, 0.25, 0.14, 0.01, x + 0.12, 1.36, -0.055, 'white', [0.12, 0.09, 0.08]);
+      box(b, 0.012, 0.012, 0.01, x + 0.15, 1.52, -0.06, 'white', [1, 0.7, 0.2], 2);
+    }
+    box(b, 2.85, 0.08, 0.08, 0, 2.3, -0.03, 'stone_brick', [0.6, 0.55, 0.5]); box(b, 2.85, 0.08, 0.08, 0, 0.8, -0.03, 'stone_brick', [0.6, 0.55, 0.5]);
+    return b.build();
+  },
+  monument: () => {
+    const b = new GeoBuilder();
+    const ST: C3 = [0.78, 0.76, 0.72];
+    box(b, 7, 1.2, 7, 0, 0.6, 0, 'stone_brick', ST, 0, [3.5, 0.6]);
+    box(b, 5, 1.0, 5, 0, 1.7, 0, 'stone_brick', ST, 0, [2.5, 0.5]);
+    box(b, 2.2, 0.8, 0.06, 0, 1.7, -2.53, 'white', [0.3, 0.27, 0.24]); // the plinth's worn inscription
+    // the priest: robed body, raised arms, head thrown back
+    const robe = new THREE.CylinderGeometry(0.9, 1.4, 5, 10); robe.translate(0, 4.7, 0); b.add(robe, { layer: 'stone', color: ST, uvScale: [3, 2] });
+    const chest = new THREE.SphereGeometry(1.05, 10, 8); chest.scale(1, 1.1, 0.8); chest.translate(0, 7.4, 0); b.add(chest, { layer: 'stone', color: ST });
+    const head = new THREE.SphereGeometry(0.55, 10, 8); head.translate(0, 8.8, 0.25); b.add(head, { layer: 'stone', color: ST });
+    for (const s of [-1, 1]) { const arm = new THREE.CylinderGeometry(0.22, 0.28, 3.2, 7); arm.rotateZ(s * 0.6); arm.translate(s * 1.6, 8.9, 0); b.add(arm, { layer: 'stone', color: ST }); }
+    // two serpents coiling around him
+    for (const s of [0, Math.PI]) {
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 40; i++) { const t = i / 40, a = s + t * Math.PI * 5.5, r = 1.6 - t * 0.6; pts.push(new THREE.Vector3(Math.cos(a) * r, 2.4 + t * 7.2, Math.sin(a) * r)); }
+      pts.push(new THREE.Vector3(Math.cos(s) * 1.9, 10.2, Math.sin(s) * 0.8));
+      b.add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 120, 0.28, 7), { layer: 'moss_stone', color: [0.62, 0.66, 0.58], uvScale: [12, 1] });
+      const sh = new THREE.SphereGeometry(0.42, 8, 6); sh.scale(1, 0.7, 1.5); sh.translate(Math.cos(s) * 1.9, 10.3, Math.sin(s) * 0.8); b.add(sh, { layer: 'moss_stone', color: [0.62, 0.66, 0.58] });
+    }
+    return b.build();
+  },
+  black_wall: () => { const b = new GeoBuilder(); box(b, 2, WALL_H, 0.7, 0, WALL_H / 2, 0, 'stone_brick', [0.22, 0.2, 0.22], 0, [1, WALL_H / 2]); return b.build(); },
+  black_spire: () => {
+    const b = new GeoBuilder();
+    const t = new THREE.CylinderGeometry(3.2, 4.2, 26, 8); t.translate(0, 13, 0); b.add(t, { layer: 'stone_brick', color: [0.2, 0.18, 0.2], uvScale: [8, 13] });
+    const top = new THREE.ConeGeometry(3.8, 12, 8); top.translate(0, 32, 0); b.add(top, { layer: 'basalt', color: [0.25, 0.22, 0.24], uvScale: [6, 4] });
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; box(b, 0.5, 1.4, 0.2, Math.sin(a) * 3.3, 18 + (i % 2) * 4, Math.cos(a) * 3.3, 'white', [1, 0.35, 0.1], 2.4); }
+    const cr = new THREE.TorusGeometry(2.2, 0.2, 6, 16); cr.rotateX(Math.PI / 2); cr.translate(0, 38.5, 0); b.add(cr, { layer: 'white', color: [0.15, 0.12, 0.15], glow: 0.3 });
+    return b.build();
+  },
+  cathedral_spire: () => {
+    const b = new GeoBuilder();
+    const t = new THREE.CylinderGeometry(2.2, 2.4, 20, 8); t.translate(0, 10, 0); b.add(t, { layer: 'stone_brick', color: [0.42, 0.4, 0.42], uvScale: [6, 10] });
+    const c = new THREE.ConeGeometry(2.6, 10, 8); c.translate(0, 25, 0); b.add(c, { layer: 'shingles', color: [0.3, 0.3, 0.34], uvScale: [5, 4] });
+    for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; box(b, 0.6, 2.4, 0.1, Math.sin(a) * 2.3, 16, Math.cos(a) * 2.3, 'white', [1, 0.7, 0.3], 1.2); }
+    return b.build();
+  },
+  judgment_altar: () => {
+    const b = new GeoBuilder();
+    box(b, 2.4, 1.1, 1.2, 0, 0.55, 0, 'stone_brick', [0.3, 0.28, 0.3]);
+    box(b, 2.6, 0.12, 1.4, 0, 1.15, 0, 'stone', [0.5, 0.45, 0.4]);
+    box(b, 0.12, 0.12, 0.05, 0, 0.7, -0.62, 'white', [1, 0.62, 0.1], 2.5);
+    flame(b, -1.0, 1.2, 0, 1.2); flame(b, 1.0, 1.2, 0, 1.2);
+    return b.build();
+  },
+  rose_window: () => {
+    const b = new GeoBuilder();
+    const ring = new THREE.CircleGeometry(1.6, 16); ring.translate(0, 0, -0.02); b.add(ring, { layer: 'white', color: [0.6, 0.15, 0.12], glow: 0.8 });
+    for (let i = 0; i < 8; i++) { const p2 = new THREE.CircleGeometry(0.45, 8); const a = i / 8 * Math.PI * 2; p2.translate(Math.cos(a) * 1.0, Math.sin(a) * 1.0, -0.03); b.add(p2, { layer: 'white', color: i % 2 ? [0.2, 0.3, 0.8] : [0.9, 0.7, 0.2], glow: 0.9 }); }
+    return b.build();
+  },
   loot_chest: () => {
     const b = new GeoBuilder();
     box(b, 1.0, 0.45, 0.66, 0, 0.22, 0, 'planks', [0.42, 0.36, 0.32]);

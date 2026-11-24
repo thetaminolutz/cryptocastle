@@ -6,7 +6,7 @@ export const WALL_H = 2.4;
 
 export type Snap = 'cell' | 'edge' | 'corner' | 'free';
 export type PieceCat = 'structure' | 'furniture' | 'light';
-export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim' | 'tablet' | 'rite' | 'gate' | 'board' | 'waystone' | 'stash' | 'hoard' | 'loot';
+export type PieceUse = 'door' | 'bed' | 'chest' | 'sit' | 'claim' | 'tablet' | 'rite' | 'gate' | 'board' | 'waystone' | 'stash' | 'hoard' | 'loot' | 'fresco' | 'plinth' | 'altar_judge' | 'grave';
 
 /** Local axis-aligned collision box: [minX, minY, minZ, maxX, maxY, maxZ] (rot 0, facing -Z). */
 export type Box = [number, number, number, number, number, number];
@@ -90,11 +90,19 @@ P({ id: 'quest_board', name: 'Quest Board', cat: 'furniture', snap: 'free', cost
 P({ id: 'waystone', name: 'Waystone', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.4, 0, -0.4, 0.4, 2.0, 0.4]], top: 2, use: 'waystone', icon: 'claim', hidden: true, light: [0.5, 0.9, 1.6, 6] });
 P({ id: 'stash', name: 'Bank Vault', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.6, 0, -0.4, 0.6, 1.2, 0.4]], top: 1.2, use: 'stash', icon: 'chest', hidden: true });
 P({ id: 'gravestone', name: 'Gravestone', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.35, 0, -0.1, 0.35, 0.9, 0.1]], top: 0.9, icon: 'claim', hidden: true });
-P({ id: 'grave_pit', name: 'Open Grave', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'carpet', hidden: true });
+P({ id: 'grave_pit', name: 'Open Grave', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, use: 'grave', icon: 'carpet', hidden: true });
 P({ id: 'hoard_chest', name: 'Robbers\' Hoard', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.5, 0, -0.35, 0.5, 0.65, 0.35]], top: 0.65, use: 'hoard', icon: 'chest', hidden: true });
 
 P({ id: 'loot_chest', name: 'Old Chest', cat: 'furniture', snap: 'free', cost: [], boxes: [[-0.5, 0, -0.35, 0.5, 0.65, 0.35]], top: 0.65, use: 'loot', icon: 'chest', hidden: true });
 P({ id: 'cracked_wall', name: 'Cracked Wall', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'wall', hidden: true });
+
+P({ id: 'fresco', name: 'The Living Fresco', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, use: 'fresco', icon: 'painting', hidden: true });
+P({ id: 'monument', name: 'Monument of Warning', cat: 'structure', snap: 'free', cost: [], boxes: [[-3.5, 0, -3.5, 3.5, 2.2, 3.5], [-1.4, 2.2, -1.4, 1.4, 11, 1.4]], top: 11, use: 'plinth', icon: 'pillar', hidden: true });
+P({ id: 'black_wall', name: 'Black Wall', cat: 'structure', snap: 'edge', cost: [], boxes: [[-1, 0, -0.35, 1, WALL_H, 0.35]], top: WALL_H, icon: 'wall', hidden: true });
+P({ id: 'black_spire', name: 'Black Spire', cat: 'structure', snap: 'free', cost: [], boxes: [[-4, 0, -4, 4, 2, 4]], top: 2, icon: 'pillar', hidden: true, light: [2.4, 0.6, 0.3, 14] });
+P({ id: 'cathedral_spire', name: 'Cathedral Spire', cat: 'structure', snap: 'free', cost: [], boxes: [[-2.4, 0, -2.4, 2.4, 22, 2.4]], top: 22, icon: 'pillar', hidden: true });
+P({ id: 'judgment_altar', name: 'Altar of Judgment', cat: 'furniture', snap: 'free', cost: [], boxes: [[-1.2, 0, -0.6, 1.2, 1.1, 0.6]], top: 1.1, use: 'altar_judge', icon: 'table', hidden: true, light: [2.6, 1.6, 0.6, 9] });
+P({ id: 'rose_window', name: 'Rose Window', cat: 'furniture', snap: 'free', cost: [], boxes: [], top: 0, icon: 'painting', hidden: true });
 
 export const CLAIM_RADIUS = 22;
 

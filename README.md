@@ -21,7 +21,8 @@ TypeScript + Vite + Three.js; no CDNs, no network calls at runtime.
 | M9 Opening, Ashen Stranger, Herald, Tower of the First Rite, character creation | ✅ done |
 | M10 Quests, journal, map, main story chapters 1–4, the Pale Citadel | ✅ done |
 | M11 Remaining enemies, bosses, dungeons, unique items, armour sets | ✅ done |
-| M12 Herald errands, profile, wish shards, Living Fresco, endings | next |
+| M12 Herald errands, profile, wish shards, Living Fresco, endings | ✅ done |
+| M13 Procedural quests, world events, achievements, Codex | next |
 | M4–M15 | see the feature bible |
 
 The world is **smooth and realistic**: terrain is a density field meshed with
@@ -165,6 +166,28 @@ Heavy, of Burning, of Frost…); and **35 unique named items with lore**
 (Whisperfang, The Gravedigger's Spade, Hemera's Lantern, Crown of the Drowned,
 The Last Thread, The Hollow Edge, Falcon Wing…) dropped by bosses and found in
 hidden treasure rooms.
+
+**The Herald and the end of the story (M12):** the Herald now rides in (hoofbeats
+first) after every boss fight, calls you by your character's name and judges how
+you fought — brave, clever, cowardly or cruel — with gold, permanent boons,
+fines or curses. When you are near death in a boss fight he lays his hands on
+you and heals you, for a favour he will collect. He hands out **errands** with
+moral weight (deliver a sealed box before nightfall without opening it, spy on a
+merchant, spread false news in a village, poison Lachesis' wine, dig up Old Hob)
+that you can obey, refuse or trick; refusing has a price. A hidden **profile**
+built only from in-game behaviour (favourite weapon, where you hesitate, what you
+flee from, what kills you, who you are kind or cruel to, night or day) feeds his
+unsettling remarks. **Wish shards** (from bosses and some elites) summon him to
+grant a wish — a treasure, a level, a secret, the map, a loyal hound companion,
+or bringing back someone his errands took — some with a hidden price. Every
+chapel has a **Living Fresco** that paints panels of what you actually did. The
+main story runs on through chapter 5 (the killer sheep), 6 (the Golden Falcon), 7
+(the Monument of Warning: a priest strangled by serpents), 8 (the Fresco and the
+Ashen Stranger's secret), 9 (the errands), 10 (judgment in the Cathedral — or a
+fight with its Warden), 11 (allies pledged by village guards who trust you) and
+12 (the assault on the Hollow King's black tower with your allies), ending in
+**three endings**: take the crown, shatter it, or — if you uncovered the truth —
+speak the sorcerer's name. The world stays open afterwards.
 
 Controls (touch): left thumb = floating joystick (push to the edge to sprint),
 drag on the right = camera (tap an enemy to lock on), **Strike/Mine/Chop/Dig** (hold to keep swinging), **Block**,

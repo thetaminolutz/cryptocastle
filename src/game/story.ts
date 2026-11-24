@@ -17,6 +17,7 @@ import type { Creatures } from '../entities/creatures';
 import type { Props } from '../world/props';
 import { ENEMIES } from '../data/enemies';
 import { audio } from '../engine/audio';
+import { playScene, sceneOpen } from '../ui/scene';
 
 /** six tablets, the rusty chest, the seventh tablet */
 export const RITE_STEPS = 8;
@@ -26,10 +27,10 @@ export interface StorySave { step: StoryStep; tablets: number; profile: Profile;
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 // ------------------------------------------------------------------ actors
-function strangerModel(b: GeoBuilder) {
+export function strangerModel(b: GeoBuilder) {
   humanoid(b, { h: 1.85, w: 0.9, skin: [0.78, 0.8, 0.82], cloth: [0.42, 0.42, 0.44], pants: [0.35, 0.35, 0.37], hood: [0.3, 0.3, 0.32], eye: [0.6, 0.75, 0.9], eyeGlow: 0.6, weapon: 'none' });
 }
-function heraldModel(b: GeoBuilder) {
+export function heraldModel(b: GeoBuilder) {
   // huge armoured black horse
   quadruped(b, { body: [0.46, 0.55, 1.2], bodyY: 1.75, legLen: 1.25, legR: 0.09, legX: 0.26, legZ: 0.9, head: [0.18, 0.24, 0.5], headPos: [0, 2.75, -1.75], neck: 0.8, color: [0.05, 0.05, 0.06], dark: [0.03, 0.03, 0.035], tail: 0.8 },
     (bb) => {
@@ -51,7 +52,7 @@ function heraldModel(b: GeoBuilder) {
   const smock = new THREE.ConeGeometry(0.55, 1.2, 10, 1, true); smock.translate(0, 2.4, 0.15); add(b, smock, [0.2, 0.2, 0.22], 0, V(), 'fabric');
 }
 
-class Actor {
+export class Actor {
   readonly mesh: THREE.Mesh;
   private geo = new THREE.InstancedBufferGeometry();
   private a: THREE.InstancedBufferAttribute; private b: THREE.InstancedBufferAttribute; private c: THREE.InstancedBufferAttribute;
@@ -126,8 +127,9 @@ export class Story {
   private ambushDone = false;
   private heraldT = -1;
   private towerLoaded = false;
+  /** the Stranger returns to his fire later in the story */
+  strangerBack = false;
   private needFire = false;
-  private dlg: HTMLDivElement | null = null;
 
   constructor(private ui: HTMLElement, private world: World, private building: Building, private player: Player, private creatures: Creatures, private props: Props, private hooks: StoryHooks) {
     this.group.add(this.stranger.mesh, this.herald.mesh);
@@ -147,7 +149,7 @@ export class Story {
   }
   serialize(): StorySave { return { step: this.step, tablets: this.tablets, profile: this.profile }; }
 
-  get busy() { return !!this.dlg; }
+  get busy() { return sceneOpen(); }
 
   update(dt: number, time: number) {
     const p = this.player.pos;
@@ -165,7 +167,7 @@ export class Story {
     }
     // the Stranger stands by his fire until the rite is done
     const s = this.stranger;
-    s.visible = this.step !== 'free' && this.world.isLoaded(CAMPFIRE.x, CAMPFIRE.z);
+    s.visible = (this.step !== 'free' || this.strangerBack) && this.world.isLoaded(CAMPFIRE.x, CAMPFIRE.z);
     if (s.visible) {
       s.pos.set(CAMPFIRE.x + 1.3, this.world.groundY(CAMPFIRE.x + 1.3, CAMPFIRE.z), CAMPFIRE.z);
       s.yaw = Math.atan2(-(p.x - s.pos.x), -(p.z - s.pos.z)) * 0.3 + Math.PI / 2 * 0.7;
@@ -183,7 +185,7 @@ export class Story {
       h.phase += dt * (t < 1 ? 9 : 1);
       h.yaw = t < 1 ? Math.atan2(-(to.x - from.x), -(to.z - from.z)) : Math.atan2(-(p.x - h.pos.x), -(p.z - h.pos.z));
       if (t < 1 && Math.floor(this.heraldT * 3) !== Math.floor((this.heraldT - dt) * 3)) audio.hoof(Math.min(1, 0.3 + t));
-      if (t >= 1 && this.step === 'gorge' && !this.dlg) this.heraldSpeaks();
+      if (t >= 1 && this.step === 'gorge' && !sceneOpen()) this.heraldSpeaks();
     }
     h.visible = this.heraldT >= 0 && (this.step === 'gorge' || this.step === 'tower' || this.step === 'rite');
     h.write();
@@ -278,34 +280,7 @@ export class Story {
   }
 
   // ---------------------------------------------------------------- story dialogue box
-  private say(name: string, color: string, lines: string[], done: () => void) {
-    this.dlg?.remove();
-    const root = document.createElement('div'); root.className = 'dialogue';
-    const box = document.createElement('div'); box.className = 'dlg-box';
-    const who = document.createElement('div'); who.className = 'dlg-who'; who.innerHTML = `<b style="color:${color}">${name}</b>`;
-    const text = document.createElement('div'); text.className = 'dlg-text';
-    const next = document.createElement('button'); next.className = 'btn dlg-opt'; next.style.textAlign = 'center';
-    box.append(who, text, next); root.appendChild(box);
-    this.ui.appendChild(root);
-    this.dlg = root;
-    audio.whisper();
-    let i = 0, shown = 0, full = false;
-    const show = () => {
-      const line = lines[i];
-      shown = 0; full = false;
-      next.textContent = i < lines.length - 1 ? 'Continue' : 'Go';
-      const tick = () => { if (!this.dlg || full) return; shown += 2; text.textContent = line.slice(0, shown); if (shown < line.length) requestAnimationFrame(tick); else full = true; };
-      tick();
-    };
-    text.addEventListener('pointerup', () => { full = true; text.textContent = lines[i]; });
-    next.addEventListener('click', () => {
-      if (!full) { full = true; text.textContent = lines[i]; return; }
-      i++;
-      if (i >= lines.length) { root.remove(); this.dlg = null; done(); return; }
-      show();
-    });
-    show();
-  }
+  private say(name: string, color: string, lines: string[], done: () => void) { playScene(this.ui, name, color, lines, done); }
 }
 
 export { SPRING };

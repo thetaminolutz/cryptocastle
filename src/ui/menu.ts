@@ -17,6 +17,8 @@ export interface MenuHooks {
   onClose(): void;
   renderMap(host: HTMLElement): void;
   renderJournal(host: HTMLElement): void;
+  /** a special action for an item in the pack (wish shards, the sealed box) */
+  itemAction(id: string): { label: string; run: () => void } | null;
 }
 
 const STATION_NAME: Record<Station, string> = { hand: 'By hand', workbench: 'Workbench', campfire: 'Campfire', furnace: 'Furnace', anvil: 'Anvil' };
@@ -161,6 +163,8 @@ export class Menu {
     if (s.n > 1) stat(`Stack: ${s.n}`);
     const btn = (label: string, fn: () => void) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = label; b.addEventListener('click', fn); box.appendChild(b); };
     if (d.armor) btn('Wear', () => { this.inv.equipFrom(this.infoSlot); });
+    const act = this.hooks.itemAction(s.id);
+    if (act) btn(act.label, () => { this.close(); act.run(); });
     if (s.n > 1) btn('Split', () => this.inv.split(this.infoSlot));
     if (this.infoSlot >= HOTBAR) btn('To belt', () => {
       const free = this.inv.slots.findIndex((x, k) => k < HOTBAR && !x);

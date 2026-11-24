@@ -612,3 +612,19 @@ BOSS({ id: 'frost_colossus', name: 'The Frost Colossus', desc: 'A mountain’s w
   weak: { fire: 1.8, blunt: 1.2, ice: 0 }, onHit: ['frozen', 0.5], loot: [['crystal_shard', 3, 6, 1], ['moonstone', 0, 1, 0.5]], gold: [80, 150], xp: 620,
   boss: { title: 'Winter’s Last Word', phases: [{ at: 0.65, summon: ['frost_wolf', 3], say: 'Wolves howl out of the blizzard!' }, { at: 0.3, speedMul: 1.3, dmgMul: 1.2 }], slam: { radius: 6, dmg: 42, every: 7, type: 'ice' }, drops: ['boots_of_the_hare', 'moonsilver_blade', 'pilgrims_sandals'] },
   build: golem });
+
+
+// ------------------------------------------------------------------ friends (never hostile)
+E({ id: 'loyal_hound', name: 'Loyal Hound', desc: 'A grey hound with amber eyes. It came with the wish, and it will not leave.',
+  hp: 120, dmg: 12, dmgType: 'pierce', speed: 3, run: 8.5, reach: 1.6, cooldown: 1.1, windup: 0.3, radius: 0.45, height: 1.0,
+  weak: {}, loot: [], gold: [0, 0], xp: 0, biomes: [], group: [1, 1], scale: 0.85, build: (b) => direWolf(b, [0.45, 0.43, 0.42], [1, 0.7, 0.2]) });
+E({ id: 'citadel_guard', name: 'Pale Guard', desc: 'One of the Citadel’s watch, sworn to stand with you.',
+  hp: 200, dmg: 16, dmgType: 'slash', speed: 2.6, run: 6.0, reach: 2.0, cooldown: 1.3, windup: 0.4, radius: 0.45, height: 1.9,
+  weak: {}, loot: [], gold: [0, 0], xp: 0, biomes: [], group: [1, 1],
+  build: (b) => humanoid(b, { h: 1.9, w: 1.1, skin: [0.75, 0.6, 0.5], cloth: [0.9, 0.88, 0.82], pants: [0.6, 0.58, 0.55], eye: [0.1, 0.1, 0.1], layer: 'white', weapon: 'spear' }) });
+E({ id: 'cathedral_warden', name: 'The Warden of the Cathedral', desc: 'The Herald’s executioner. Faceless, patient, and never late.', scale: 1.25,
+  hp: 1100, dmg: 30, dmgType: 'shadow', speed: 2.2, run: 5.0, reach: 2.8, cooldown: 1.5, windup: 0.6, radius: 0.7, height: 2.5,
+  weak: { holy: 1.6, blunt: 1.2 }, onHit: ['curse', 0.4], loot: [['silver_bar', 1, 2, 1]], gold: [120, 200], xp: 900, biomes: [], group: [1, 1],
+  ranged: { kind: 'shadow', speed: 16, range: 16 },
+  boss: { title: 'Hand of the Herald', phases: [{ at: 0.7, ranged: true, say: '“The rules were explained to you.”' }, { at: 0.35, summon: ['dark_knight', 1], speedMul: 1.25, say: '“The Cathedral remembers every name.”' }], slam: { radius: 5, dmg: 36, every: 8, type: 'shadow' }, drops: ['veil_of_the_stranger', 'aegis_of_dawn'] },
+  build: (b) => { humanoid(b, { h: 2.0, w: 1.3, skin: [0.15, 0.15, 0.16], cloth: [0.18, 0.18, 0.2], pants: [0.12, 0.12, 0.14], hood: [0.1, 0.1, 0.12], eye: [1, 0.62, 0.1], eyeGlow: 3, layer: 'basalt', weapon: 'sword' }); } });

@@ -156,6 +156,7 @@ function placeBuilding(pieces: Piece[], buildings: BuildingInfo[], b: PlanB, ox:
     furn.push({ id: 'banner', x: W / 2 - 1.2, y: 0, z: D - 0.4, rot: 0 }, { id: 'banner', x: W / 2 + 1.2, y: 0, z: D - 0.4, rot: 0 }, { id: 'altar', x: W / 2, y: 0, z: D - 1.4, rot: 0 });
     for (let k = 0; k < 2; k++) furn.push({ id: 'pew', x: W / 2 - 1.3, y: 0, z: 2.4 + k * 1.6, rot: 0 }, { id: 'pew', x: W / 2 + 1.3, y: 0, z: 2.4 + k * 1.6, rot: 0 });
     furn.push({ id: 'lantern', x: 0.5, y: 0, z: 0.5, rot: 0 });
+    furn.push({ id: 'fresco', x: W / 2, y: 0, z: D - 0.2, rot: 0 });
   } else if (b.kind === 'smithy') {
     furn.push({ id: 'anvil_piece', x: W / 2, y: 0, z: 2, rot: 0 }, { id: 'forge', x: W - 1.0, y: 0, z: D - 0.8, rot: 0 }, { id: 'weapon_rack', x: 0.6, y: 0, z: D - 0.4, rot: 0 });
   }

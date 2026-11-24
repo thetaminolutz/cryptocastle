@@ -425,6 +425,11 @@ export class Interaction {
         else if (use === 'waystone') { label = 'Touch the waystone'; this.action = () => this.ui.special(piece); }
         else if (use === 'stash') { label = 'Open your vault'; this.action = () => this.ui.special(piece); }
         else if (use === 'hoard') { label = 'Open the hoard'; this.action = () => this.ui.special(piece); }
+        else if (use === 'loot') { label = 'Open the chest'; this.action = () => this.ui.special(piece); }
+        else if (use === 'fresco') { label = 'Study the fresco'; this.action = () => this.ui.special(piece); }
+        else if (use === 'plinth') { label = 'Read the plinth'; this.action = () => this.ui.special(piece); }
+        else if (use === 'altar_judge') { label = 'Approach the altar'; this.action = () => this.ui.special(piece); }
+        else if (use === 'grave') { label = 'Look into the grave'; this.action = () => this.ui.special(piece); }
         else if (use === 'rite') { label = 'Open the chest'; this.action = () => this.ui.special(piece); }
         else if (use === 'claim') { label = 'Boundary stone'; this.action = () => this.ui.toast(this.building.isSafe(this.player.pos) ? 'Your land is claimed and lit. Monsters will not spawn here.' : 'Your land is claimed. Light it (torch, lantern, fireplace) to keep monsters away.', '#c8b0ff'); }
       } else if (plant) {

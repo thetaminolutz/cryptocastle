@@ -16,3 +16,13 @@ export const CITADEL_HALF = 34;
 export const CITADEL_R = 46;
 /** the scorpion labyrinth lies beneath the citadel: 13x13 cells of 6 m, floor 12 m down */
 export const LAB = { cells: 13, cell: 6, depth: 12, width: 3, height: 3.4 };
+
+// Chapters 5–12
+/** the Monument of Warning: a priest strangled by serpents, alone in the wilderness */
+export const MONUMENT = { x: -620, z: -980 };
+/** the Cathedral where the Herald judges */
+export const CATHEDRAL = { x: 520, z: -820 };
+/** the Hollow King's black fortress at the far edge of the story map */
+export const HOLLOW_TOWER = { x: 1180, z: -1560 };
+/** the long-dead sorcerer whose will became the Herald and the Stranger */
+export const SORCERER = 'Morvaine';

@@ -18,7 +18,7 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const RESET_DAYS = 7;
 
 export interface DelveState { cleared: number[]; chests: string[]; boss: boolean; day: number; }
-export interface DelveHooks { toast(t: string, c?: string): void; addGold(n: number): void; day(): number; bossDead(id: string): boolean; }
+export interface DelveHooks { log?(text: string): void; toast(t: string, c?: string): void; addGold(n: number): void; day(): number; bossDead(id: string): boolean; }
 
 export class Delves {
   state: Record<string, DelveState> = {};
@@ -95,7 +95,7 @@ export class Delves {
     }
     if (foes.every((c) => c.state === 'dead' || !this.creatures.list.includes(c))) {
       s.cleared.push(ri);
-      if (room.boss) { s.boss = true; this.hooks.toast(`${D.name} falls silent.`, '#c8b0ff'); }
+      if (room.boss) { s.boss = true; this.hooks.toast(`${D.name} falls silent.`, '#c8b0ff'); this.hooks.log?.(`Cleared ${D.name}`); }
       this.roomFoes.delete(key);
       if (!s.day) s.day = this.hooks.day();
     }

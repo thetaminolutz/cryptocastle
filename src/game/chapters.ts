@@ -37,6 +37,8 @@ export class Chapters {
   readonly lab: Labyrinth;
   readonly labEntrance: { x: number; z: number };
   stash: (Stack | null)[] = new Array(24).fill(null);
+  /** places provided by later chapters */
+  extraPlace: ((p: Place) => { x: number; z: number } | null) | null = null;
   arenaWins = 0;
   private graveLoaded = false;
   private labLoaded = false;
@@ -68,6 +70,8 @@ export class Chapters {
       case 'citadel': return { x: this.citadel.x, z: this.citadel.z };
       case 'arena': return { x: this.citadel.x + ARENA_DX, z: this.citadel.z + ARENA_DZ + ARENA_R + 2 };
       case 'quest_board': return { x: this.citadel.x + 5, z: this.citadel.z + 5 };
+      case 'chapel': return { x: this.citadel.x + 34 - 7, z: this.citadel.z + 22 + 6 };
+      default: return this.extraPlace?.(p) ?? null;
     }
   }
 

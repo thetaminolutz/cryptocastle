@@ -157,6 +157,9 @@ export class Villagers {
     return out;
   }
 
+  /** NPCs taken from the world by the Herald's errands */
+  gone = new Set<string>();
+
   private load(site: VillageSite) {
     const layout = buildLayout(site);
     this.building.setGenerated(site.id, layout.pieces);
@@ -275,7 +278,7 @@ export class Villagers {
     }
     const threats = this.creatures.alive.filter((c) => c.state !== 'hidden');
     const all: NPC[] = [];
-    for (const v of this.villages.values()) for (const p of v.npcs) { this.think(v, p, dt, hours, threats, player); all.push(p); }
+    for (const v of this.villages.values()) for (const p of v.npcs) { this.think(v, p, dt, hours, threats, player); if (this.gone.has(p.name)) p.hidden = true; all.push(p); }
     for (const [o, l] of this.layers) l.write(all.filter((p) => p.outfit === o && !p.hidden && p.pos.distanceToSquared(player) < 120 * 120));
     this.updateBubbles(all, player, camera, dt);
   }

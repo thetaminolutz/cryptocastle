@@ -21,6 +21,8 @@ export interface Creature {
   slot: number; alerted: boolean; knock: THREE.Vector3; burn: number; hover: number;
   /** bosses: phase reached, slam timer, movement multiplier; ranged: this windup ends in a shot */
   phaseIdx: number; slamT: number; speedMul: number; shooting: boolean; rangedOn: boolean;
+  /** fights on the player's side (pets, allies) */
+  ally?: boolean;
 }
 
 export interface CreatureHooks {
@@ -96,7 +98,8 @@ export class Creatures {
     }
   }
 
-  get alive() { return this.list.filter((c) => c.state !== 'dead'); }
+  get alive() { return this.list.filter((c) => c.state !== 'dead' && !c.ally); }
+  get allies() { return this.list.filter((c) => c.state !== 'dead' && c.ally); }
 
   spawn(def: EnemyDef, pos: THREE.Vector3, danger: number, slot = 0) {
     const elite = Math.random() < 0.05 + Math.min(0.1, danger * 0.01);
@@ -152,6 +155,7 @@ export class Creatures {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const c = this.list[i];
       const far = c.pos.distanceToSquared(player) > 110 * 110;
+      if (c.ally && (far || !this.world.isLoaded(c.pos.x, c.pos.z))) { if (this.world.isLoaded(player.x + 2, player.z + 2)) c.pos.set(player.x + 2, this.world.groundY(player.x + 2, player.z + 2), player.z + 2); this.think(c, dt, player, night, playerHidden); continue; }
       if (far || !this.world.isLoaded(c.pos.x, c.pos.z) || (c.state === 'dead' && c.deadT > (c.looted ? 30 : 120))) { this.list.splice(i, 1); continue; }
       this.think(c, dt, player, night, playerHidden);
     }
@@ -197,6 +201,7 @@ export class Creatures {
       d = Math.atan2(Math.sin(d), Math.cos(d));
       c.yaw += d * Math.min(1, dt * k);
     };
+    if (c.ally) { this.thinkAlly(c, dt, player, face); return; }
     const detect = (night ? 18 : 14) * (hidden ? 0.5 : 1);
     switch (c.state) {
       case 'hidden':
@@ -294,6 +299,36 @@ export class Creatures {
       }
     }
     want *= c.speedMul;
+    c.speed += (want - c.speed) * Math.min(1, dt * 6);
+    if (Math.abs(c.speed) > 0.05) this.move(c, -Math.sin(c.yaw) * c.speed * dt, -Math.cos(c.yaw) * c.speed * dt);
+    c.phase += dt * (2 + c.speed * 3) + (def.flying ? dt * 6 : 0);
+    if (def.flying) c.hover = 0.9 + Math.sin(c.phase * 0.3) * 0.25;
+  }
+
+  /** allies: guard the player, fight whatever hunts them, never wander far */
+  private thinkAlly(c: Creature, dt: number, player: THREE.Vector3, face: (x: number, z: number, k?: number) => void) {
+    const def = c.def;
+    let foe: Creature | null = null, best = 22;
+    for (const o of this.list) {
+      if (o.ally || o.state === 'dead' || o.state === 'hidden') continue;
+      const d = o.pos.distanceTo(player);
+      if (d < best) { best = d; foe = o; }
+    }
+    let want = 0;
+    const dist = Math.hypot(player.x - c.pos.x, player.z - c.pos.z);
+    if (foe) {
+      const d = Math.hypot(foe.pos.x - c.pos.x, foe.pos.z - c.pos.z);
+      face(foe.pos.x, foe.pos.z, 8);
+      if (d > def.reach + foe.def.radius) want = def.run;
+      else if (c.timer <= 0) {
+        c.attackT = 1; c.timer = def.cooldown;
+        this.damage(foe, def.dmg * c.dmgMul, def.dmgType, c.pos, false);
+        foe.alerted = true;
+      }
+    } else if (dist > 3.5) { face(player.x, player.z, 6); want = dist > 9 ? def.run : def.speed; }
+    if (dist > 45 && this.world.isLoaded(player.x + 2, player.z + 2)) c.pos.set(player.x + 2, this.world.groundY(player.x + 2, player.z + 2), player.z + 2);
+    c.attackT = Math.max(0, c.attackT - dt * 3);
+    c.hp = Math.min(c.maxHp, c.hp + dt * 3);
     c.speed += (want - c.speed) * Math.min(1, dt * 6);
     if (Math.abs(c.speed) > 0.05) this.move(c, -Math.sin(c.yaw) * c.speed * dt, -Math.cos(c.yaw) * c.speed * dt);
     c.phase += dt * (2 + c.speed * 3) + (def.flying ? dt * 6 : 0);

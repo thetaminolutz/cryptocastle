@@ -11,7 +11,9 @@ import { CHUNK_HEIGHT, CHUNK_SIZE, SEA_LEVEL } from './constants';
 import { Biome, BIOMES, CLIMATE_BIOMES, Plant } from './biomes';
 import { dungeonForCell, dungeonDist, Dungeon, DUNGEON_CELL } from './dungeons';
 import { villageAt, flattenWeight, isVillageHeightOk, VillageSite, citadelSite, labyrinthOf, labyrinthDist, Labyrinth } from './villages';
-import { SPRING, GORGE, TOWER, CAMPFIRE, GRAVEYARD, CITADEL_HALF, LAB } from '../data/story';
+import { SPRING, GORGE, TOWER, CAMPFIRE, GRAVEYARD, CITADEL_HALF, LAB, MONUMENT, CATHEDRAL, HOLLOW_TOWER } from '../data/story';
+
+const LANDMARKS: [{ x: number; z: number }, number][] = [[MONUMENT, 24], [CATHEDRAL, 38], [HOLLOW_TOWER, 52]];
 
 export const PAD = CHUNK_SIZE + 2;           // padded width (18): grid points -1..16
 export const PAD_LAYER = PAD * PAD;
@@ -127,6 +129,17 @@ export class TerrainGen {
     // a small glade around the Ashen Stranger's campfire (no trees, so the light shows)
     const cd = Math.hypot(x - CAMPFIRE.x, z - CAMPFIRE.z);
     if (cd < 9) c.village = Math.max(c.village, Math.min(1, (9 - cd) / 3) * 0.6);
+    // the late story's landmarks stand on level ground, out of the water
+    for (let i = 0; i < LANDMARKS.length; i++) {
+      const [L, R] = LANDMARKS[i];
+      const ld = Math.hypot(x - L.x, z - L.z);
+      if (ld >= R + 14) continue;
+      if (this.markH[i] === undefined) this.markH[i] = Math.max(SEA_LEVEL + 4, this.rawColumn(L.x, L.z).height);
+      const w = Math.max(0, Math.min(1, (R + 14 - ld) / 14));
+      c.height = c.height * (1 - w) + this.markH[i] * w;
+      c.village = Math.max(c.village, w);
+      if (w > 0.5) { c.liquidLevel = Math.min(c.liquidLevel, c.height - 2); if (c.biome === Biome.Ocean || c.biome === Biome.Beach) c.biome = Biome.HauntedMoor; }
+    }
     // the old barrow cemetery (chapter 2) on level ground
     const gd = Math.hypot(x - GRAVEYARD.x, z - GRAVEYARD.z);
     if (gd < 26) {
@@ -157,6 +170,9 @@ export class TerrainGen {
 
   private towerH: number | null = null;
   private graveH: number | null = null;
+  private markH: number[] = [];
+  /** ground height at a story landmark */
+  landmarkY(i: number) { const [L] = LANDMARKS[i]; return this.column(L.x, L.z).height; }
   private lab: Labyrinth | null = null;
   private dgRaw = (x: number, z: number) => { const c = this.rawColumn(x, z); return { height: c.height, ok: true, biome: c.biome }; };
   /** The dungeon whose area contains (x, z), if any. */

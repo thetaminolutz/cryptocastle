@@ -59,6 +59,8 @@ export class Combat {
   /** Damage multiplier from levels. */
   /** character perks: damage, life steal, fire/curse chance, extra block, crit chance */
   perks = { dmg: 1, lifesteal: 0, fire: 0, curse: 0, block: 0, crit: 0.08, frost: 0, ranged: 0, attackSpeed: 0, xp: 1, gold: 1, fireRes: 0, poisonRes: 0 };
+  /** play-style events for the Herald's watcher */
+  onEvent: ((e: 'parry' | 'block' | 'hit' | 'swing' | 'shot' | 'proc', kind?: string) => void) | null = null;
   /** fires a projectile (set by the game) */
   shoot: ((from: THREE.Vector3, dir: THREE.Vector3, speed: number, dmg: number, type: DmgType, kind: 'arrow' | 'bolt' | 'spell') => void) | null = null;
   get power() { return 1 + (this.level - 1) * 0.04; }
@@ -117,7 +119,9 @@ export class Combat {
     const w = weaponOf(held);
     const mult = (heavy ? 2.2 : combo >= 2 ? 1.45 : 1) * this.power * this.perks.dmg;
     const origin = p.pos.clone().setY(p.pos.y + 1);
-    if (w.ranged) return this.fireRanged(w, mult, heavy);
+    const kind = held ? ITEMS[held]?.tool?.kind ?? 'fists' : 'fists';
+    if (w.ranged) { this.onEvent?.('shot', kind); return this.fireRanged(w, mult, heavy); }
+    this.onEvent?.('swing', kind);
     // with a locked target, swing toward it
     if (this.lock && this.lock.pos.distanceTo(p.pos) < w.reach + 2) p.yaw = Math.atan2(-(this.lock.pos.x - p.pos.x), -(this.lock.pos.z - p.pos.z));
     let hit = false;
@@ -129,7 +133,7 @@ export class Combat {
       this.lastHit = c;
       hit = true;
       if (this.perks.lifesteal) p.life = Math.min(p.maxLife, p.life + dmg * this.perks.lifesteal);
-      if (c.state !== 'dead' && Math.random() < this.perks.fire) c.burn = Math.max(c.burn, 3);
+      if (c.state !== 'dead' && Math.random() < this.perks.fire) { c.burn = Math.max(c.burn, 3); this.onEvent?.('proc'); }
       if (c.state !== 'dead' && Math.random() < this.perks.frost) { this.creatures.stun(c, 1.1); this.number(c.pos.clone().setY(c.pos.y + c.def.height + 0.4), 'Frozen', '#a8e0ff'); }
       if (c.state !== 'dead' && Math.random() < this.perks.curse) { this.creatures.damage(c, c.maxHp * 0.06, 'shadow', p.pos, false); this.number(c.pos.clone().setY(c.pos.y + c.def.height + 0.4), 'Cursed', '#b080e0'); }
       if (c.state === 'dead') this.onKill(c);
@@ -225,6 +229,7 @@ export class Combat {
       if (this.time - this.blockPressed < 0.25) {
         // perfect timing: parry
         onParry?.();
+        this.onEvent?.('parry');
         audio.parry();
         this.number(p.pos.clone().setY(p.pos.y + 2), 'Parry!', '#ffe080', true);
         this.hooks.shake(0.08);
@@ -235,6 +240,7 @@ export class Combat {
       p.stamina -= cost;
       dmg *= 1 - block;
       audio.block();
+      this.onEvent?.('block');
       if (p.stamina <= 0) { p.stamina = 0; p.stunT = 0.9; this.hooks.toast('Your guard breaks!', '#e08070'); }
       status = undefined;
     }
@@ -243,6 +249,7 @@ export class Combat {
     if (type === 'fire') dmg *= 1 - this.perks.fireRes;
     if (status && status[0] === 'poison' && this.perks.poisonRes >= 1) status = undefined;
     p.damage(dmg, name.toLowerCase().startsWith('a') ? `an ${name.toLowerCase()}` : `a ${name.toLowerCase()}`);
+    this.onEvent?.('hit');
     this.number(p.pos.clone().setY(p.pos.y + 2), String(Math.round(dmg)), '#ff5a4a');
     this.hooks.shake(Math.min(0.4, 0.08 + dmg / 60));
     if (settings.values.hitSound) audio.hurt();
