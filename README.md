@@ -98,6 +98,19 @@ a room at the inn, trade at the general store, smithy, alchemist, tailor or inn
 (prices follow reputation; shops have limited gold and restock every few days),
 or pickpocket, insult and threaten — word travels, and reputation is remembered.
 
+**Look & feel update:** a skeuomorphic, minimal interface (leather and
+parchment panels, embossed brass buttons, glass-tube life and stamina bars,
+engraved iron touch buttons with icons, book-style type); an illustrated **How
+to play** guide before the first journey and in the menu (Help); the journey now
+starts at sunrise with brighter, moonlit nights; **realistic attacks** — keyframed
+wind-up, strike, follow-through and recovery, different swings per combo step
+and weapon (forehand and backhand slashes, two-handed overheads, lunging
+thrusts, a bow draw), a step into each blow, a weapon trail, hit-stop, blood,
+sparks and bone dust where blows land, and enemies that flinch; livelier hero
+animation (pelvis roll, leaning into turns, landing dips, idle weight shifts, a
+fighting stance near enemies); more anatomical enemies and villagers (shoulders,
+neck, jaw, nose, brow, ears, elbows, hands, knees, boots).
+
 **Polish (M15):** contextual **tutorial hints** that appear once, the first
 time something becomes possible (moving, using things, fighting, stamina,
 wounds, night, gathering, crafting, building, gear, villages, the journal,

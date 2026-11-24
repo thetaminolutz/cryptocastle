@@ -1,3 +1,4 @@
+import { GLYPH } from './glyphs';
 // Touch controls: floating joystick (left thumb), drag-to-look (right side) and
 // action buttons. Sizes respect settings; layout mirrors for left-handed players.
 import { input, ButtonName } from '../engine/input';
@@ -44,7 +45,7 @@ export class TouchControls {
     for (const s of this.specs) {
       const el = document.createElement('div');
       el.className = 'touch-btn';
-      el.textContent = this.labels.get(s.name) ?? s.label;
+      this.paint(el, s.name, this.labels.get(s.name) ?? s.label);
       el.style.display = this.hidden.has(s.name) ? 'none' : 'flex';
       this.byName.set(s.name, el);
       const side = left ? 'left' : 'right';
@@ -62,7 +63,12 @@ export class TouchControls {
   setLabel(name: ButtonName, text: string) {
     if (this.labels.get(name) === text) return;
     this.labels.set(name, text);
-    const el = this.byName.get(name); if (el) el.textContent = text;
+    const el = this.byName.get(name); if (el) this.paint(el, name, text);
+  }
+  /** icon + small caption */
+  private paint(el: HTMLElement, name: string, text: string) {
+    const ico = name === 'attack' && /shoot/i.test(text) ? GLYPH.bow : GLYPH[name];
+    el.innerHTML = ico ? `<span class="ico">${ico}</span><span class="cap">${text}</span>` : text;
   }
   setVisible(name: ButtonName, v: boolean) {
     if (v === !this.hidden.has(name)) return;

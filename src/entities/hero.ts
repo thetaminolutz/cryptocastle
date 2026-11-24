@@ -410,6 +410,52 @@ function buildStaff(): THREE.Group {
 }
 
 // ------------------------------------------------------------------ the model
+
+const TRAIL_N = 10;
+// ------------------------------------------------------------------ attacks
+/** A pose for the parts of the body that move in an attack (radians / metres). */
+interface APose { aRx: number; aRz: number; fR: number; aLx: number; aLz: number; fL: number; chY: number; chX: number; spX: number; hpY: number; hipsY: number; thL: number; shL: number; thR: number; shR: number; lunge: number; }
+const P0: APose = { aRx: 0.35, aRz: 0.15, fR: 0.5, aLx: 0.2, aLz: -0.15, fL: 0.4, chY: 0, chX: 0, spX: 0.05, hpY: 0, hipsY: 0, thL: 0, shL: -0.08, thR: 0, shR: -0.08, lunge: 0 };
+const P = (o: Partial<APose>): APose => ({ ...P0, ...o });
+export type AttackKind = 'slashR' | 'slashL' | 'overhead' | 'thrust' | 'shoot' | 'tool';
+/** keyframes: [time 0..1, pose]; the blow lands around 0.6 */
+const ATTACKS: Record<AttackKind, [number, APose][]> = {
+  // forehand diagonal: from high right, across and down to the left
+  slashR: [[0, P({ thL: 0.25, shL: -0.3 })], [0.38, P({ aRx: 2.3, aRz: 1.05, fR: 1.0, aLx: 0.6, aLz: -0.5, fL: 0.9, chY: -0.65, hpY: -0.25, spX: -0.02, thL: 0.35, shL: -0.4, thR: -0.15, hipsY: -0.04 })],
+    [0.6, P({ aRx: 1.0, aRz: -0.55, fR: 0.15, aLx: 0.3, aLz: -0.7, fL: 0.6, chY: 0.6, hpY: 0.3, spX: 0.2, chX: 0.12, thL: 0.55, shL: -0.6, thR: -0.25, hipsY: -0.09, lunge: 0.32 })],
+    [0.78, P({ aRx: 0.6, aRz: -0.75, fR: 0.3, chY: 0.72, hpY: 0.3, spX: 0.22, thL: 0.5, shL: -0.55, thR: -0.2, hipsY: -0.08, lunge: 0.3 })], [1, P({})]],
+  // backhand: from low left, up and out to the right
+  slashL: [[0, P({})], [0.36, P({ aRx: 1.0, aRz: -0.85, fR: 1.5, aLx: 0.5, aLz: -0.3, chY: 0.6, hpY: 0.25, thR: 0.3, shR: -0.4, hipsY: -0.05 })],
+    [0.6, P({ aRx: 1.85, aRz: 1.0, fR: 0.2, aLx: 0.2, aLz: -0.8, chY: -0.55, hpY: -0.3, spX: 0.12, thR: 0.5, shR: -0.55, thL: -0.2, hipsY: -0.08, lunge: 0.28 })],
+    [0.78, P({ aRx: 2.05, aRz: 1.15, fR: 0.25, chY: -0.65, hpY: -0.3, spX: 0.12, thR: 0.45, shR: -0.5, hipsY: -0.07, lunge: 0.26 })], [1, P({})]],
+  // two-handed overhead: lean back, then come down with the whole body
+  overhead: [[0, P({})], [0.42, P({ aRx: 3.05, aRz: 0.25, fR: 1.25, aLx: 2.8, aLz: 0.35, fL: 1.25, spX: -0.22, chX: -0.18, thL: 0.2, shL: -0.25, hipsY: 0.02 })],
+    [0.6, P({ aRx: 0.75, aRz: 0.05, fR: 0.1, aLx: 0.8, aLz: 0.3, fL: 0.25, spX: 0.5, chX: 0.3, thL: 0.75, shL: -0.85, thR: -0.35, shR: -0.2, hipsY: -0.16, lunge: 0.45 })],
+    [0.8, P({ aRx: 0.45, aRz: 0.05, fR: 0.15, aLx: 0.5, aLz: 0.3, fL: 0.3, spX: 0.55, chX: 0.3, thL: 0.7, shL: -0.8, thR: -0.3, hipsY: -0.15, lunge: 0.42 })], [1, P({})]],
+  // thrust: draw the weapon back at the hip, then drive it straight out with a lunge
+  thrust: [[0, P({})], [0.38, P({ aRx: 0.9, aRz: 0.55, fR: 1.9, aLx: 0.8, aLz: -0.2, fL: 0.6, chY: -0.5, hpY: -0.2, thR: 0.15, hipsY: -0.04 })],
+    [0.58, P({ aRx: 1.6, aRz: 0.02, fR: 0.0, aLx: 0.0, aLz: -0.45, fL: 0.2, chY: 0.4, hpY: 0.2, spX: 0.25, chX: 0.1, thL: 0.8, shL: -0.75, thR: -0.45, shR: -0.15, hipsY: -0.12, lunge: 0.6 })],
+    [0.78, P({ aRx: 1.55, aRz: 0.05, fR: 0.05, chY: 0.4, hpY: 0.2, spX: 0.25, thL: 0.75, shL: -0.7, thR: -0.4, hipsY: -0.11, lunge: 0.58 })], [1, P({})]],
+  // a bow: side-on stance, bow arm out, draw to the cheek, release
+  shoot: [[0, P({})], [0.3, P({ aLx: 1.55, aLz: 0.0, fL: 0.05, aRx: 1.45, aRz: -0.35, fR: 1.5, chY: -0.75, hpY: -0.35, thL: 0.2, thR: -0.2 })],
+    [0.58, P({ aLx: 1.58, aLz: 0.0, fL: 0.0, aRx: 1.35, aRz: -0.7, fR: 2.4, chY: -0.85, hpY: -0.4, thL: 0.2, thR: -0.2 })],
+    [0.66, P({ aLx: 1.55, aLz: 0.0, fL: 0.05, aRx: 1.5, aRz: 0.2, fR: 1.2, chY: -0.8, hpY: -0.4, thL: 0.2, thR: -0.2 })], [1, P({})]],
+  // tools: the old chop / mine arc
+  tool: [[0, P({})], [0.45, P({ aRx: 2.9, aRz: 0.25, fR: 1.1, chY: -0.35, spX: -0.05 })], [0.62, P({ aRx: 0.9, aRz: 0.25, fR: 0.3, chY: 0.25, chX: 0.25, spX: 0.25, hipsY: -0.06 })], [1, P({})]]
+};
+const ease = (t: number) => t * t * (3 - 2 * t);
+/** pose of an attack at time t, and how strongly it should override (0..1) */
+function attackPose(kind: AttackKind, t: number): APose {
+  const K = ATTACKS[kind];
+  let i = 0;
+  while (i < K.length - 2 && K[i + 1][0] <= t) i++;
+  const [ta, a] = K[i], [tb, b] = K[i + 1];
+  const f = ease(Math.max(0, Math.min(1, (t - ta) / (tb - ta))));
+  const out = { ...a };
+  for (const k of Object.keys(a) as (keyof APose)[]) out[k] = a[k] + (b[k] - a[k]) * f;
+  return out;
+}
+
 export class HeroModel {
   readonly root = new THREE.Group();
   readonly mesh: THREE.SkinnedMesh;
@@ -424,6 +470,19 @@ export class HeroModel {
   swing = -1;
   /** 0..1 bending down to harvest */
   harvest = 0;
+  /** which attack the current swing is */
+  attackKind: AttackKind = 'tool';
+  /** enemies close: knees bent, weapon up */
+  stance = false;
+  private yawPrev = 0;
+  private turnLean = 0;
+  private wasGround = true;
+  private landT = 0;
+  private stanceK = 0;
+  /** world-space weapon trail (added to the scene by the game) */
+  readonly trail!: THREE.Mesh;
+  private trailPts: THREE.Vector3[] = [];
+  private tipLen = 0.8;
   readonly handR: THREE.Bone;
   readonly handL: THREE.Bone;
   private shieldSlot = new THREE.Group();
@@ -456,12 +515,30 @@ export class HeroModel {
     this.held.position.set(0, -0.06, -0.01);
     this.handR.add(this.held);
     this.setHeld(null);
+    {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 2 * 3), 3));
+      g.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 2), 1));
+      const idx: number[] = [];
+      for (let i = 0; i < TRAIL_N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      g.setIndex(idx);
+      const m = new THREE.ShaderMaterial({
+        vertexShader: 'attribute float alpha; varying float vA; void main() { vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'varying float vA; void main() { gl_FragColor = vec4(1.0, 0.95, 0.85, vA * 0.35); }',
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
+      });
+      (this as { trail: THREE.Mesh }).trail = new THREE.Mesh(g, m);
+      this.trail.frustumCulled = false;
+      this.trail.visible = false;
+    }
     this.bones[BONES.hips].add(this.tail);
   }
 
   /** Show an item mesh in the right hand (null = the starting staff). */
   setHeld(obj: THREE.Object3D | null) {
     this.held.clear();
+    // weapon length for the trail
+    if (obj) { const b = new THREE.Box3().setFromObject(obj); this.tipLen = Math.max(0.3, b.max.y); } else this.tipLen = 1.0;
     const o = obj ?? this.staff;
     if (!obj) { o.rotation.set(0.12, 0, 0); o.position.set(0, -0.32, -0.02); }
     this.held.add(o);
@@ -530,6 +607,14 @@ export class HeroModel {
     this.root.position.copy(p.pos);
     this.root.rotation.y = p.yaw;
     const k = Math.min(1, dt * 14);
+    // lean into turns, dip on landing, settle into a fighting stance
+    let dyaw = p.yaw - this.yawPrev; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw)); this.yawPrev = p.yaw;
+    this.turnLean += (Math.max(-0.25, Math.min(0.25, -dyaw / Math.max(dt, 1e-3) * 0.045 * Math.min(1, p.speed / 4))) - this.turnLean) * Math.min(1, dt * 6);
+    const groundNow = p.state === 'ground';
+    if (groundNow && !this.wasGround) this.landT = Math.min(0.35, 0.12 + Math.max(0, -p.vel.y) * 0.02);
+    this.wasGround = groundNow;
+    this.landT = Math.max(0, this.landT - dt);
+    this.stanceK += ((this.stance && p.speed < 3 && groundNow ? 1 : 0) - this.stanceK) * Math.min(1, dt * 5);
     const speed = p.speed;
     const run = Math.min(1, Math.max(0, (speed - 4.5) / 3));
     const walk = Math.min(1, speed / 2.5);
@@ -540,7 +625,8 @@ export class HeroModel {
 
     // defaults (idle) — breathing and a slow look around
     const breathe = Math.sin(this.t * 2.1) * 0.025;
-    let hipsY = POS.hips.y, lean = 0.04 + run * 0.18;
+    let hipsY = POS.hips.y, lean = 0.04 + run * 0.2;
+    let hipsRoll = Math.cos(this.phase) * 0.07 * walk; // the pelvis drops toward the swinging leg
     let rootPitch = 0;
     const legA = (0.5 + run * 0.4) * walk, armA = (0.42 + run * 0.4) * walk;
     // each leg: thigh swings with sin(phase); the knee bends while the leg swings forward
@@ -554,6 +640,22 @@ export class HeroModel {
     let foreL = 0.2 + run * 0.9 + Math.max(0, -s) * 0.3 * walk, foreR = 0.2 + run * 0.9 + Math.max(0, s) * 0.3 * walk;
     let spineX = lean * 0.5 + breathe * 0.5, chestX = lean * 0.5, chestY = -s * 0.12 * walk, hipsYaw = s * 0.08 * walk;
     let headX = -lean * 0.6, headY = Math.sin(this.t * 0.35) * 0.25 * (1 - walk);
+    // idle: a slow weight shift from foot to foot
+    const shift = Math.sin(this.t * 0.6) * (1 - walk);
+    hipsRoll += shift * 0.04; thighL += shift * 0.03; thighR -= shift * 0.03; shinR -= Math.max(0, shift) * 0.12; shinL -= Math.max(0, -shift) * 0.12;
+    // running: forearms bent, hands loose, pushing off the toes
+    foreL += run * 0.35; foreR += run * 0.35;
+    footL -= Math.max(0, -s) * 0.35 * walk; footR -= Math.max(0, s) * 0.35 * walk;
+    // landing: knees give way and recover
+    if (this.landT > 0) { const d = this.landT * 1.6; hipsY -= d * 0.35; thighL += d * 0.9; thighR += d * 0.9; shinL -= d * 1.6; shinR -= d * 1.6; spineX += d * 0.6; }
+    // fighting stance
+    const st = this.stanceK;
+    if (st > 0.01) {
+      hipsY -= 0.06 * st; thighL += 0.3 * st; shinL -= 0.45 * st; thighR -= 0.12 * st; shinR -= 0.3 * st;
+      armRx += (0.85 - armRx) * st; armRz += (0.35 - armRz) * st; foreR += (1.25 - foreR) * st;
+      armLx += (0.7 - armLx) * st; armLz += (-0.25 - armLz) * st; foreL += (1.1 - foreL) * st;
+      chestY += -0.25 * st; hipsYaw += -0.2 * st; spineX += 0.08 * st;
+    }
 
     switch (p.state) {
       case 'air':
@@ -586,13 +688,20 @@ export class HeroModel {
       armLx = armRx = 0.45; foreL = foreR = 0.6; spineX = 0.05; chestX = 0;
     }
 
-    // tool swing (right arm + torso twist)
+    // attacks: keyframed wind-up, strike, follow-through and recovery
+    let lunge = 0, kk = k;
     if (this.swing >= 0) {
-      const t = this.swing;
-      const up = t < 0.45 ? t / 0.45 : 1 - (t - 0.45) / 0.55;
-      const strike = t < 0.45 ? 0 : Math.min(1, (t - 0.45) / 0.25);
-      armRx = 0.3 + up * 2.6 - strike * 0.4; armRz = 0.25; foreR = 0.3 + up * 0.8;
-      chestY = -0.35 * up + 0.25 * strike; chestX += strike * 0.25;
+      const A = attackPose(this.attackKind, this.swing);
+      const w = Math.min(1, this.swing / 0.08, (1 - this.swing) / 0.12 + 0.2); // blend in and out
+      const mix = (a: number, b: number) => a + (b - a) * Math.min(1, w);
+      armRx = mix(armRx, A.aRx); armRz = mix(armRz, A.aRz); foreR = mix(foreR, A.fR);
+      const twoHanded = this.attackKind === 'overhead' || this.attackKind === 'shoot' || (this.attackKind !== 'tool' && !this.blocking);
+      if (twoHanded) { armLx = mix(armLx, A.aLx); armLz = mix(armLz, A.aLz); foreL = mix(foreL, A.fL); }
+      chestY = mix(chestY, A.chY); chestX += A.chX * w; spineX += A.spX * w; hipsYaw += A.hpY * w; hipsY += A.hipsY * w;
+      if (walk < 0.5) { thighL = mix(thighL, A.thL); shinL = mix(shinL, A.shL); thighR = mix(thighR, A.thR); shinR = mix(shinR, A.shR); }
+      lunge = A.lunge * w;
+      // the strike itself is fast: no smoothing between 0.4 and 0.65
+      if (this.swing > 0.36 && this.swing < 0.68) kk = Math.min(1, dt * 30);
     }
     // blocking: raise the shield arm across the body
     if (this.blocking) { armLx = 1.25; armLz = 0.35; foreL = 1.3; spineX += 0.08; }
@@ -607,16 +716,19 @@ export class HeroModel {
     this.mesh.rotation.x += (rootPitch - this.mesh.rotation.x) * (p.state === 'roll' ? 1 : k);
     if (p.state === 'swim' || p.state === 'roll') this.mesh.position.y = p.state === 'roll' ? 0.45 : 0.9;
     else this.mesh.position.y += (0 - this.mesh.position.y) * k;
-    this.aim('hips', 0, hipsYaw, 0, k);
+    this.aim('hips', 0, hipsYaw, hipsRoll, k);
+    this.mesh.rotation.z += (this.turnLean - this.mesh.rotation.z) * k;
+    this.mesh.position.z += (-lunge - this.mesh.position.z) * Math.min(1, dt * 16);
     this.aim('spine', spineX, 0, 0, k);
-    this.aim('chest', chestX + breathe * 0.4, chestY, 0, k);
+    this.aim('chest', chestX + breathe * 0.4, chestY, 0, kk);
     this.aim('neck', headX * 0.4, headY * 0.4, 0, k);
     this.aim('head', headX * 0.6, headY * 0.6, 0, k);
     this.aim('thighL', thighL, 0, 0.03, k); this.aim('thighR', thighR, 0, -0.03, k);
     this.aim('shinL', shinL, 0, 0, k); this.aim('shinR', shinR, 0, 0, k);
     this.aim('footL', footL, 0, 0, k); this.aim('footR', footR, 0, 0, k);
-    this.aim('upperArmL', armLx, 0, armLz, k); this.aim('upperArmR', armRx, 0, armRz, k);
-    this.aim('forearmL', foreL, 0, 0, k); this.aim('forearmR', foreR, 0, 0, k);
+    this.aim('upperArmL', armLx, 0, armLz, kk); this.aim('upperArmR', armRx, 0, armRz, kk);
+    this.aim('forearmL', foreL, 0, 0, kk); this.aim('forearmR', foreR, 0, 0, kk);
+    this.updateTrail();
 
     // cloak springs: trail behind when moving, lift when falling
     const fwd = speed * (p.state === 'swim' ? 0.02 : 0.11) + Math.max(0, -p.vel.y) * 0.05 + Math.sin(this.t * 1.7) * 0.03;
@@ -629,5 +741,30 @@ export class HeroModel {
       b.rotation.x = -this.cloakAng[i] * (i === 0 ? 0.5 : 0.7) - (i === 0 ? spineX * 0.5 : 0);
       b.rotation.z = Math.sin(this.t * 2.3 + i) * 0.03 * (1 + speed * 0.1);
     }
+  }
+
+  /** a fading ribbon behind the blade during the strike */
+  private updateTrail() {
+    const on = this.swing > 0.4 && this.swing < 0.78 && this.attackKind !== 'shoot' && this.attackKind !== 'tool' && this.root.visible;
+    if (!on) { if (this.trailPts.length) this.trailPts = []; this.trail.visible = false; return; }
+    this.root.updateMatrixWorld(true);
+    const base = new THREE.Vector3(), tip = new THREE.Vector3(0, this.tipLen, 0);
+    this.held.getWorldPosition(base);
+    this.held.localToWorld(tip);
+    const mid = base.clone().lerp(tip, 0.35);
+    this.trailPts.unshift(mid, tip);
+    if (this.trailPts.length > TRAIL_N * 2) this.trailPts.length = TRAIL_N * 2;
+    const pos = this.trail.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const al = this.trail.geometry.getAttribute('alpha') as THREE.BufferAttribute;
+    const n = this.trailPts.length / 2;
+    for (let i = 0; i < TRAIL_N; i++) {
+      const j = Math.min(i, n - 1);
+      const a = this.trailPts[j * 2], b = this.trailPts[j * 2 + 1];
+      pos.setXYZ(i * 2, a.x, a.y, a.z); pos.setXYZ(i * 2 + 1, b.x, b.y, b.z);
+      const f = i < n ? 1 - i / TRAIL_N : 0;
+      al.setX(i * 2, f * 0.2); al.setX(i * 2 + 1, f);
+    }
+    pos.needsUpdate = true; al.needsUpdate = true;
+    this.trail.visible = n > 1;
   }
 }

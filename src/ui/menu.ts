@@ -1,3 +1,4 @@
+import { renderGuide } from './guide';
 // The in-game menu: Inventory (drag & drop, long-press info, split), Crafting,
 // Settings and Save. Touch-first; also works with a mouse.
 import { Inventory, HOTBAR, BACKPACK, Stack, stackName } from '../game/inventory';
@@ -8,7 +9,7 @@ import { iconUrl } from './icons';
 import { slotHTML } from './hotbar';
 import { buildSettings } from './settings-panel';
 
-export type MenuTab = 'inventory' | 'gear' | 'crafting' | 'map' | 'journal' | 'codex' | 'settings' | 'save' | 'chest';
+export type MenuTab = 'inventory' | 'gear' | 'crafting' | 'map' | 'journal' | 'codex' | 'help' | 'settings' | 'save' | 'chest';
 export interface MenuHooks {
   stations(): Set<Station>;
   save(): Promise<void>;
@@ -47,7 +48,7 @@ export class Menu {
     const tabs = document.createElement('div');
     tabs.className = 'tabs';
     if (tab !== 'chest') this.chest = null;
-    const tabList: [MenuTab, string][] = [['inventory', 'Pack'], ['gear', 'Gear'], ['crafting', 'Craft'], ['map', 'Map'], ['journal', 'Journal'], ['codex', 'Codex'], ['settings', 'Settings'], ['save', 'Save']];
+    const tabList: [MenuTab, string][] = [['inventory', 'Pack'], ['gear', 'Gear'], ['crafting', 'Craft'], ['map', 'Map'], ['journal', 'Journal'], ['codex', 'Codex'], ['help', 'Help'], ['settings', 'Settings'], ['save', 'Save']];
     if (this.chest) tabList.unshift(['chest', 'Chest']);
     for (const [t, label] of tabList) {
       const b = document.createElement('button');
@@ -87,6 +88,7 @@ export class Menu {
     else if (this.tab === 'map') this.hooks.renderMap(b);
     else if (this.tab === 'journal') this.hooks.renderJournal(b);
     else if (this.tab === 'codex') this.hooks.renderCodex(b);
+    else if (this.tab === 'help') renderGuide(b);
     else if (this.tab === 'settings') buildSettings(b);
     else this.renderSave(b);
   }

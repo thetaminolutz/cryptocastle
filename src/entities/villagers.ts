@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { GeoBuilder } from '../world/vegetation';
 import { propMaterial } from '../world/shaders';
-import { add, ell, cap, eyes } from '../data/enemies';
+import { add, ell, eyes } from '../data/enemies';
 import { buildLayout, Job, Layout, Spot, VillageSite, VILLAGE_CELL, siteForCell, BuildingInfo } from '../world/villages';
 import { NAMES_F, NAMES_M, SURNAMES, TRAITS, Trait, GIFTABLE, DISLIKED_BY_ALL, CHATTER } from '../data/npcs';
 import { mulberry32 } from '../world/noise';
@@ -22,6 +22,16 @@ export type Outfit = 'man' | 'woman' | 'child' | 'guard' | 'smith' | 'priest' | 
 const OUTFITS: Outfit[] = ['man', 'woman', 'child', 'guard', 'smith', 'priest', 'merchant'];
 
 // ------------------------------------------------------------------ models
+/** capsule geometry between two points (with a rounded end) */
+function segGeo(ax: number, ay: number, az: number, bx: number, by: number, bz: number, r0: number, r1: number): THREE.BufferGeometry {
+  const A = V(ax, ay, az), B = V(bx, by, bz), len = A.distanceTo(B);
+  const g = new THREE.CylinderGeometry(r1, r0, len, 10, 2, true);
+  g.translate(0, len / 2, 0);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), B.clone().sub(A).normalize()));
+  g.translate(ax, ay, az);
+  return g;
+}
+
 function person(b: GeoBuilder, o: Outfit) {
   const child = o === 'child';
   const s = child ? 0.62 : 1;
@@ -44,8 +54,15 @@ function person(b: GeoBuilder, o: Outfit) {
   add(b, ell(0.17, 0.05, 0.12, 0, hip + 0.04, 0, 10), [0.22, 0.15, 0.1], 0, V());
   // head, hair, face
   const headP = V(0, 1.5 * s, 0);
-  add(b, ell(0.1 * (child ? 1.15 : 1), 0.12 * (child ? 1.1 : 1), 0.105 * (child ? 1.1 : 1), 0, hy, 0, 14), skin, 5, headP);
-  add(b, ell(0.025, 0.03, 0.03, 0, hy - 0.005, -0.105), skin, 5, headP); // nose
+  const hk = child ? 1.15 : 1;
+  add(b, segGeo(0, 1.46 * s, 0, 0, hy - 0.08, 0, 0.05 * s, 0.045 * s), skin, 5, headP);                 // neck
+  for (const sd of [-1, 1]) cloth(ell(0.08, 0.07 * s, 0.085, sd * 0.18 * (child ? 0.9 : 1), sh - 0.01, 0, 10), 0, V()); // shoulders
+  add(b, ell(0.097 * hk, 0.116 * hk, 0.104 * hk, 0, hy, 0, 14), skin, 5, headP);                        // cranium
+  add(b, ell(0.072 * hk, 0.048, 0.078 * hk, 0, hy - 0.072, -0.022, 10), skin, 5, headP);                 // jaw
+  add(b, ell(0.08 * hk, 0.016, 0.028, 0, hy + 0.028, -0.085 * hk, 8), [skin[0] * 0.9, skin[1] * 0.9, skin[2] * 0.9], 5, headP); // brow
+  const nose = new THREE.ConeGeometry(0.016, 0.05, 6); nose.rotateX(-Math.PI / 2 - 0.4); nose.translate(0, hy - 0.015, -0.11 * hk); add(b, nose, skin, 5, headP);
+  for (const sd of [-1, 1]) add(b, ell(0.014, 0.03, 0.022, sd * 0.098 * hk, hy - 0.005, 0, 6), skin, 5, headP); // ears
+  add(b, ell(0.028, 0.008, 0.01, 0, hy - 0.055, -0.098 * hk, 6), [0.6, 0.35, 0.32], 5, headP);            // lips
   eyes(b, 0.035, hy + 0.02, -0.095, 0.012, [0.12, 0.1, 0.08], 0, 5, headP);
   if (o === 'woman') { add(b, ell(0.115, 0.1, 0.11, 0, hy + 0.05, 0.02, 12), hair, 5, headP); add(b, ell(0.08, 0.16, 0.06, 0, hy - 0.08, 0.08, 10), hair, 5, headP); }
   else if (o === 'guard') { const h = new THREE.SphereGeometry(0.125, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2); h.translate(0, hy + 0.02, 0); add(b, h, [0.55, 0.56, 0.6], 5, headP, 'ore_silver'); add(b, ell(0.012, 0.08, 0.02, 0, hy - 0.04, -0.12), [0.5, 0.5, 0.55], 5, headP); }
@@ -54,10 +71,13 @@ function person(b: GeoBuilder, o: Outfit) {
   else { add(b, ell(0.108, 0.07, 0.11, 0, hy + 0.06, 0.01, 12), hair, 5, headP); if (o === 'man' || o === 'smith') add(b, ell(0.07, 0.06, 0.04, 0, hy - 0.08, -0.08, 8), hair, 5, headP); }
   // arms: left = 1, right = 9
   for (const [side, bone] of [[-1, 1], [1, 9]] as const) {
-    const x = side * 0.235 * (child ? 0.9 : 1);
-    if (o === 'guard') add(b, cap(0.055, 0.46 * s, x, sh, 0), [0.55, 0.56, 0.6], bone, V(x, sh, 0), 'ore_silver');
-    else cloth(cap(0.052, 0.46 * s, x, sh, 0), bone, V(x, sh, 0));
-    add(b, ell(0.04, 0.05, 0.04, x, sh - 0.6 * s, 0, 8), skin, bone, V(x, sh, 0));
+    const x = side * 0.205 * (child ? 0.9 : 1), ex = side * 0.24 * (child ? 0.9 : 1), ey = sh - 0.3 * s, hx = side * 0.245 * (child ? 0.9 : 1), hy2 = sh - 0.6 * s;
+    const piv = V(x, sh, 0);
+    if (o === 'guard') add(b, segGeo(x, sh, 0, ex, ey, 0.02, 0.058, 0.05), [0.55, 0.56, 0.6], bone, piv, 'ore_silver');
+    else cloth(segGeo(x, sh, 0, ex, ey, 0.02, 0.055, 0.047), bone, piv);
+    cloth(ell(0.047, 0.047, 0.047, ex, ey, 0.02, 8), bone, piv);                                         // elbow
+    add(b, segGeo(ex, ey, 0.02, hx, hy2 + 0.05, -0.04, 0.042, 0.033), skin, bone, piv);                    // forearm
+    add(b, ell(0.034, 0.05, 0.044, hx, hy2, -0.045, 8), skin, bone, piv);                                  // hand
   }
   if (o === 'guard') {
     const spear = new THREE.CylinderGeometry(0.018, 0.018, 2.1, 5); spear.translate(0.25, 1.0, -0.12); add(b, spear, [0.42, 0.3, 0.2], 9, V(0.235, sh, 0), 'bark_oak');
@@ -67,8 +87,13 @@ function person(b: GeoBuilder, o: Outfit) {
   // legs: left = 2, right = 4
   for (const [side, bone] of [[-1, 2], [1, 4]] as const) {
     const x = side * 0.095;
-    if (!dress) add(b, cap(0.068, 0.7 * s, x, hip, 0), pants, bone, V(x, hip, 0), 'fabric');
-    else add(b, cap(0.05, 0.6 * s, x, hip - 0.1, 0), skin, bone, V(x, hip, 0));
+    const piv = V(x, hip, 0), ky = 0.49 * s;
+    if (!dress) {
+      add(b, segGeo(x, hip, 0, x * 1.05, ky, -0.01, 0.076, 0.057), pants, bone, piv, 'fabric');            // thigh
+      add(b, ell(0.057, 0.057, 0.057, x * 1.05, ky, -0.01, 8), pants, bone, piv, 'fabric');                  // knee
+      add(b, segGeo(x * 1.05, ky, -0.01, x * 1.05, 0.1 * s, 0.01, 0.054, 0.042), pants, bone, piv, 'fabric'); // shin
+    } else add(b, segGeo(x, hip - 0.1, 0, x * 1.05, 0.1 * s, 0.01, 0.05, 0.04), skin, bone, piv);
+    add(b, segGeo(x * 1.05, 0.26 * s, 0, x * 1.05, 0.06 * s, 0.01, 0.058, 0.053), boots, bone, piv, 'planks');
     add(b, ell(0.055, 0.05, 0.1, x, 0.05, -0.03, 8), boots, bone, V(x, hip, 0), 'planks');
   }
 }

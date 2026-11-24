@@ -8,6 +8,7 @@ import type { SaveData } from './engine/save';
 import { ENEMIES } from './data/enemies';
 import { Game } from './game/game';
 import { seedFromString } from './world/noise';
+import { showGuide } from './ui/guide';
 
 blockSafariGestures();
 setupPWA();
@@ -23,6 +24,13 @@ const uiRoot = document.getElementById('ui')!;
 let game: Game | null = null;
 
 function startGame(slot = 0, data: SaveData | null = null, mode: 'wanderer' | 'onelife' = 'wanderer') {
+  // the first new journey on this device starts with the how-to-play guide
+  let seen = true;
+  try { seen = !!localStorage.getItem('duskmere.guide') || new URLSearchParams(location.search).has('skip'); } catch { /* private mode */ }
+  if (!data && !seen) {
+    showGuide(uiRoot, () => { try { localStorage.setItem('duskmere.guide', '1'); } catch { /* ignore */ } startGame(slot, data, mode); });
+    return;
+  }
   void requestPersistentStorage();
   audio.heartbeat();
   const params = new URLSearchParams(location.search);

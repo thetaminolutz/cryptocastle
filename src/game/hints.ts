@@ -8,7 +8,7 @@ interface Hint { id: string; text: string; when: (g: Game) => boolean; }
 
 const HINTS: Hint[] = [
   { id: 'move', text: 'Push the left half of the screen to walk — push to the edge to run. Drag on the right half to look around.', when: () => true },
-  { id: 'objective', text: 'The line at the top left is your current goal. The arrow points the way.', when: (g) => g.story.step === 'wake' && g.elapsedTime > 12 },
+  { id: 'objective', text: 'The parchment tag at the top left is your goal. The arrow next to it points the way — and the number is how far it is.', when: (g) => g.story.step === 'wake' && g.elapsedTime > 12 },
   { id: 'use', text: 'When something is in reach, a “Use” button appears on the right. Tap it to talk, open, read or pick up.', when: (g) => g.useVisible },
   { id: 'enemy', text: 'Enemies! Tap one to lock on. Strike, hold Block to raise your guard — block just as a blow lands to parry. Dodge rolls through attacks.', when: (g) => g.creatures.alive.some((c) => c.alerted && c.pos.distanceTo(g.player.pos) < 20) },
   { id: 'stamina', text: 'The blue bar is stamina: running, swinging, blocking and rolling use it. Stop for a moment to catch your breath.', when: (g) => g.player.stamina < g.player.tune.staminaMax * 0.2 },
@@ -49,7 +49,7 @@ export class Hints {
   private hide() { this.el.classList.remove('on'); this.showing = null; }
 
   update(dt: number) {
-    if (this.showing) { this.hideT -= dt; if (this.hideT <= 0) this.hide(); return; }
+    if (this.showing) { this.hideT -= dt; if (this.hideT <= 0 || this.g.dialogOpen) this.hide(); return; }
     this.timer -= dt;
     if (this.timer > 0 || !settings.values.hints) return;
     this.timer = 1;

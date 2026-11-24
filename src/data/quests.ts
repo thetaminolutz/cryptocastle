@@ -39,7 +39,7 @@ const Q = (d: QuestDef) => { QUESTS[d.id] = d; };
 // ------------------------------------------------------------------ main story
 Q({ id: 'ch1', chapter: 1, title: 'Find the Herald', desc: 'You woke with no name and no face. Somewhere in these woods, someone is waiting for you.',
   stages: [
-    { text: 'A light flickers between the trees.', objectives: [{ kind: 'flag', flag: 'met_stranger', text: 'Find the light in the woods', at: 'campfire' }] },
+    { text: 'Smoke rises between the trees.', objectives: [{ kind: 'flag', flag: 'met_stranger', text: 'Follow the smoke to the campfire', at: 'campfire' }] },
     { text: 'The Ashen Stranger told you to follow the stream to the gorge.', objectives: [{ kind: 'flag', flag: 'met_herald', text: 'Follow the stream to the gorge', at: 'herald' }] },
     { text: 'The Herald sent you to the tower beyond the gorge.', objectives: [{ kind: 'flag', flag: 'rite_done', text: 'Complete the First Rite in the tower', at: 'tower' }] }
   ],

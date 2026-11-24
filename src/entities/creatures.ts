@@ -191,6 +191,7 @@ export class Creatures {
       c.deadT += dt; c.tilt = Math.min(Math.PI / 2, c.tilt + dt * 4); c.attackT = 0; c.speed = 0; c.hover = Math.max(-0.3, c.hover - dt);
       return;
     }
+    c.tilt *= Math.exp(-dt * 7); // recover from a flinch
     if (c.burn > 0) { c.burn -= dt; this.damage(c, 3 * dt, 'fire', null, false, true); if (c.hp <= 0) return; }
     const dx = player.x - c.pos.x, dz = player.z - c.pos.z;
     const dist = Math.hypot(dx, dz);
@@ -372,6 +373,7 @@ export class Creatures {
       c.flash = 1; c.alerted = true;
       if (c.state === 'hidden' || c.state === 'idle' || c.state === 'wander') c.state = 'chase';
       this.alertNear(c, 15); // calls for help
+      if (c.def.radius < 1.2) c.tilt = Math.min(0.45, 0.18 + amount / Math.max(20, c.maxHp) * 0.8); // flinch back
       if (from) { const d = c.pos.clone().sub(from).setY(0).normalize(); c.knock.copy(d.multiplyScalar((heavy ? 7 : 3) / Math.max(1, c.def.radius * 1.5))); }
       if (heavy && c.state !== 'stunned' && c.def.radius < 0.8) { c.state = 'stunned'; c.timer = 0.7; }
     }
