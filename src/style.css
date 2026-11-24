@@ -355,7 +355,110 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .codex-list { color: #c8b890; line-height: 1.6; }
 
 /* ---- tutorial hints */
-.hint-card { position: absolute; left: 50%; top: calc(64px + var(--sat)); transform: translate(-50%, -12px); width: min(520px, 80vw); background: rgba(20,14,10,.92); border: 2px solid var(--gold); color: var(--ink); padding: 10px 14px; font-size: 14px; line-height: 1.45; opacity: 0; pointer-events: none; transition: opacity .35s, transform .35s; z-index: 5; }
+.hint-card { z-index: 3; position: absolute; left: 50%; top: calc(64px + var(--sat)); transform: translate(-50%, -12px); width: min(520px, 80vw); background: rgba(20,14,10,.92); border: 2px solid var(--gold); color: var(--ink); padding: 10px 14px; font-size: 14px; line-height: 1.45; opacity: 0; pointer-events: none; transition: opacity .35s, transform .35s; z-index: 5; }
 .hint-card.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .hint-card b { display: block; color: var(--gold); letter-spacing: 2px; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; }
 .hint-card small { display: block; margin-top: 4px; color: #7a6a58; font-size: 11px; }
+
+/* =====================================================================
+   SKIN — skeuomorphic, minimal: dark leather, parchment, brass and iron.
+   (Overrides the plain look above; layout stays the same.)
+   ===================================================================== */
+:root {
+  --font: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --ink: #efe3c8;
+  --leather: #2b1d14;
+  --leather-hi: #3c2a1d;
+  --brass: #c9a35a;
+  --brass-hi: #f3dc9e;
+  --brass-lo: #7a5a26;
+  --iron: #6c6c70;
+  --panel: rgba(30, 21, 15, 0.9);
+  --panel-border: #6b4a2c;
+  --gold: #e3bd6a;
+}
+body, button, input, select { font-family: var(--font); }
+/* leather: a warm gradient with a faint grain and a stitched edge */
+.panel, .menu-box, .dlg-box, .slot-card, .creation-panel, .board-q, .hint-card, .codex-card, .jr-item, .toast {
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(255, 220, 160, .07), transparent 60%),
+    repeating-linear-gradient(37deg, rgba(255,255,255,.012) 0 2px, rgba(0,0,0,.02) 2px 4px),
+    linear-gradient(180deg, var(--leather-hi), var(--leather));
+  border: 1px solid #120b07;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 4px rgba(0,0,0,.18), inset 0 0 0 5px rgba(201,163,90,.35), inset 0 1px 0 6px rgba(255,230,180,.04), 0 12px 32px rgba(0,0,0,.55);
+}
+.menu-box { overflow: hidden; }
+.panel h2, .menu-box h2 { font-weight: normal; letter-spacing: 3px; color: var(--gold); text-shadow: 0 1px 0 #000; }
+/* buttons: embossed brass plates */
+.btn {
+  min-height: 56px; border-radius: 12px; letter-spacing: 2px; text-transform: none; font-size: 19px; color: #2a1a0c;
+  background: linear-gradient(180deg, var(--brass-hi) 0%, var(--brass) 45%, #a8823e 55%, var(--brass-lo) 100%);
+  border: 1px solid #3a2810;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 0 rgba(0,0,0,.25), 0 3px 0 #2a1a08, 0 5px 10px rgba(0,0,0,.45);
+  text-shadow: 0 1px 0 rgba(255,240,200,.6);
+}
+.btn:active { transform: translateY(2px); background: linear-gradient(180deg, #b48a46, #8a6a30); box-shadow: inset 0 2px 4px rgba(0,0,0,.45), 0 1px 0 #2a1a08; border-color: #3a2810; }
+.btn.primary { color: #fff3dc; text-shadow: 0 -1px 0 rgba(0,0,0,.6); background: linear-gradient(180deg, #c9443a 0%, #9a1f1a 50%, #6e1210 100%); border-color: #3a0805; }
+.btn:disabled { filter: grayscale(.7) brightness(.7); }
+/* title screen: dark vellum */
+.screen { background: radial-gradient(ellipse at 50% 35%, #3a2a1c 0%, #140d08 70%, #070403 100%); }
+.title-logo { font-weight: normal; letter-spacing: 18px; color: #f1e2bd; text-shadow: 0 2px 0 #4a2a12, 0 0 40px rgba(255,200,120,.25); }
+.title-sub { font-style: italic; letter-spacing: 3px; color: #b8a27a; }
+.enter-text { font-style: italic; letter-spacing: 3px; color: #e8c890; text-shadow: 0 0 18px rgba(255,190,110,.35); }
+/* tabs: brass rail */
+.tabs { background: linear-gradient(180deg, #4a3422, #2b1d14); border-bottom: 1px solid #120b07; box-shadow: inset 0 -1px 0 rgba(201,163,90,.35); }
+.tabs button { letter-spacing: 1px; text-transform: none; font-size: 16px; color: #c8b48c; border-right: 1px solid rgba(0,0,0,.35); }
+.tabs button.on { color: #fff1cf; background: linear-gradient(180deg, rgba(227,189,106,.22), rgba(227,189,106,.05)); box-shadow: inset 0 -3px 0 var(--brass); }
+/* inventory slots: inset wooden frames */
+.slot { border-radius: 10px; border: 1px solid #120b07; background: linear-gradient(180deg, #1a110b, #2a1c12); box-shadow: inset 0 2px 5px rgba(0,0,0,.7), 0 1px 0 rgba(255,220,170,.08); }
+.slot.sel { border-color: var(--brass); box-shadow: inset 0 2px 5px rgba(0,0,0,.7), 0 0 0 2px var(--brass), 0 0 12px rgba(227,189,106,.45); }
+.hotbar { border-radius: 16px; padding: 8px; gap: 8px; border: 1px solid #120b07;
+  background: linear-gradient(180deg, rgba(60,42,29,.82), rgba(30,20,14,.82)); box-shadow: inset 0 0 0 1px rgba(201,163,90,.35), 0 6px 18px rgba(0,0,0,.45); }
+/* HUD bars: glass tubes in iron housings */
+.hud-bars { gap: 7px; }
+.bar { height: 14px; border-radius: 8px; border: 1px solid #0b0705; overflow: hidden;
+  background: linear-gradient(180deg, #0c0806, #23170f); box-shadow: inset 0 2px 3px rgba(0,0,0,.8), 0 0 0 2px rgba(120,100,80,.45), 0 1px 4px rgba(0,0,0,.6); }
+.bar .fill { position: relative; border-radius: 7px; }
+.bar .fill::after { content: ''; position: absolute; left: 3px; right: 3px; top: 1px; height: 40%; border-radius: 6px; background: linear-gradient(rgba(255,255,255,.45), rgba(255,255,255,0)); }
+.bar.life .fill { background: linear-gradient(180deg, #ff6a5e, #c4161c 55%, #7a0a0e); }
+.bar.stamina { height: 10px; }
+.bar.stamina .fill { background: linear-gradient(180deg, #8fc6ff, #2f6fd0 55%, #163a80); }
+.hud-gold, .hud-level { font-size: 14px; color: #f0d58e; text-shadow: 0 1px 2px #000; }
+/* top-right round iron buttons */
+.menu-btn { border-radius: 50%; width: 58px; height: 58px; font-size: 22px; color: #f4e7c6; border: 1px solid #0b0705;
+  background: radial-gradient(circle at 35% 30%, #8a8a90, #4a4a50 55%, #2a2a2e); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 3px rgba(0,0,0,.45), 0 3px 8px rgba(0,0,0,.5); text-shadow: 0 1px 1px #000; }
+/* touch buttons: engraved iron discs with an icon */
+.touch-btn { flex-direction: column; gap: 2px; border: 1px solid rgba(0,0,0,.6); color: #f3e8cf; text-transform: none; letter-spacing: 0;
+  background: radial-gradient(circle at 35% 28%, rgba(150,150,158,.72), rgba(70,70,76,.72) 55%, rgba(30,30,34,.78));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -3px 6px rgba(0,0,0,.45), 0 4px 10px rgba(0,0,0,.45), 0 0 0 3px rgba(201,163,90,.28); }
+.touch-btn .ico { width: 44%; height: 44%; display: block; filter: drop-shadow(0 1px 0 rgba(0,0,0,.6)); }
+.touch-btn .ico svg { width: 100%; height: 100%; display: block; }
+.touch-btn .cap { font-size: 11px; opacity: .85; text-shadow: 0 1px 1px #000; }
+.touch-btn.down { background: radial-gradient(circle at 50% 60%, rgba(200,150,80,.85), rgba(110,70,30,.85)); transform: scale(.95); }
+.touch-btn.wide { border-radius: 16px; }
+.joy-base { border: 2px solid rgba(201,163,90,.4); background: radial-gradient(circle, rgba(0,0,0,.08), rgba(0,0,0,.28)); box-shadow: inset 0 0 18px rgba(0,0,0,.4); }
+.joy-knob { background: radial-gradient(circle at 35% 30%, #d8d4cc, #8a8680 60%, #4a4844); border: 1px solid rgba(0,0,0,.5); box-shadow: 0 3px 8px rgba(0,0,0,.5); }
+/* dialogue: a parchment card on leather */
+.dlg-text { color: #2a1a0c; background: linear-gradient(180deg, #efe1bf, #dcc79a); border-radius: 8px; padding: 12px 14px; box-shadow: inset 0 0 18px rgba(120,80,30,.35); font-size: 18px; }
+.dlg-who b { letter-spacing: 1px; }
+.dlg-opt { text-transform: none; }
+/* objective: a small parchment tag */
+.hud-objective { margin-top: 8px; padding: 6px 12px; border-radius: 8px; color: #2a1a0c; text-shadow: none; font-size: 15px;
+  background: linear-gradient(180deg, rgba(240,226,192,.92), rgba(214,194,150,.92)); box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.hud-objective .obj-arrow { color: #8a1a12; }
+.hud-objective small { color: #6a5030; }
+.notes { font-size: 15px; }
+.region-banner { font-weight: normal; letter-spacing: 6px; }
+.toast { border-radius: 12px; }
+/* minimal: hide the crosshair dot until aiming matters, soften the vignette */
+.crosshair { opacity: .5; }
+.vignette { background: radial-gradient(ellipse at center, transparent 62%, rgba(0, 0, 0, .28) 100%); }
+/* how-to-play guide */
+.guide { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.guide .g-card { padding: 12px 14px; border-radius: 10px; background: linear-gradient(180deg, #efe1bf, #d8c294); color: #2a1a0c; box-shadow: inset 0 0 16px rgba(120,80,30,.3), 0 2px 6px rgba(0,0,0,.4); }
+.guide .g-card b { display: block; font-size: 17px; margin-bottom: 4px; color: #5a2a10; }
+.guide .g-card span { font-size: 15px; line-height: 1.45; }
+.guide .g-ico { float: left; width: 46px; height: 46px; margin: 0 10px 4px 0; border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #9a9aa2, #4a4a50 60%, #2a2a2e); display: flex; align-items: center; justify-content: center; }
+.guide .g-ico svg { width: 26px; height: 26px; }

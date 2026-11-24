@@ -1,7 +1,7 @@
 // Gathering & using things: aim at terrain/trees, swing tools (mine, dig, chop),
 // harvest plants, place stations, eat, drink. Also builds the 3D model of the item
 // in the hero's hand.
-import { METAL_ENV } from '../entities/hero';
+import { METAL_ENV, AttackKind } from '../entities/hero';
 import { audio } from '../engine/audio';
 import * as THREE from 'three';
 import { input } from '../engine/input';
@@ -184,6 +184,18 @@ export class Interaction {
     this.group.add(this.marker);
   }
 
+  /** which swing to play: by weapon, combo step and what is in front */
+  private chooseAttack(fighting: boolean): AttackKind {
+    const s = this.inv.held, d = s ? ITEMS[s.id] : undefined;
+    if (d?.weapon?.ranged) return 'shoot';
+    const k = d?.tool?.kind;
+    const t = this.target;
+    if (!fighting && (t?.type === 'tree' || t?.type === 'terrain') && (k === 'axe' || k === 'pickaxe' || k === 'shovel' || !d?.weapon)) return 'tool';
+    if (k === 'spear' || k === 'dagger' || k === 'knife') return this.combo === 2 ? 'slashR' : 'thrust';
+    if (k === 'hammer' || k === 'mace' || k === 'morningstar' || k === 'club') return (['slashR', 'slashL', 'overhead'] as AttackKind[])[this.combo];
+    return (['slashR', 'slashL', 'thrust'] as AttackKind[])[this.combo];
+  }
+
   private tool() {
     const s = this.inv.held;
     return s ? ITEMS[s.id].tool : undefined;
@@ -222,18 +234,25 @@ export class Interaction {
         this.queued = false;
         this.swing = 0; this.impactDone = false; this.heavy = false;
         this.swingDur = 0.58 / speed;
+        this.hero.attackKind = this.chooseAttack(fighting);
+        // step into the blow
+        if (fighting && this.player.grounded && this.hero.attackKind !== 'shoot') {
+          this.player.vel.x += -Math.sin(this.player.yaw) * 2.6; this.player.vel.z += -Math.cos(this.player.yaw) * 2.6;
+        }
       }
     }
     if (this.swing >= 0) {
       // keep holding during the wind-up in a fight → charged heavy strike
       if (fighting && !this.heavy && this.swing < 0.35 && attack.down && attack.held > 0.3 && this.player.stamina > 15) {
         this.heavy = true; this.swingDur *= 1.7;
+        if (this.hero.attackKind !== 'shoot') this.hero.attackKind = 'overhead';
       }
       this.swing += dt / this.swingDur;
       if (!this.impactDone && this.swing >= 0.62) { this.impactDone = true; this.impact(); }
       if (this.swing >= 1) this.swing = -1;
     }
     this.hero.swing = this.swing;
+    this.hero.stance = fighting;
 
     // harvesting animation then the effect
     if (this.harvestT >= 0) {
@@ -300,7 +319,8 @@ export class Interaction {
   private updateAttackLabel() {
     const t = this.target, k = this.tool()?.kind, s = this.inv.held;
     let label = 'Strike';
-    if (s && ITEMS[s.id].food) label = 'Eat';
+    if (s && ITEMS[s.id].weapon?.ranged) label = 'Shoot';
+    else if (s && ITEMS[s.id].food) label = 'Eat';
     else if (t?.type === 'tree') label = 'Chop';
     else if (t?.type === 'terrain') label = k === 'pickaxe' ? 'Mine' : 'Dig';
     this.ui.setAttack(label);

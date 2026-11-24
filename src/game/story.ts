@@ -1,4 +1,4 @@
-// The opening of the journey: waking in the moonlit clearing, the toadling ambush,
+// The opening of the journey: waking in the clearing at dawn, the toadling ambush,
 // the Ashen Stranger at his campfire, the Herald at the gorge, and the Tower of the
 // First Rite with its seven copper tablets (character creation), ending with the
 // reveal of the new face.
@@ -137,10 +137,10 @@ export class Story {
 
   /** New journey: night, campfire lit at the Stranger's place. */
   begin() {
-    this.hooks.setTime(0.88);
+    this.hooks.setTime(0.32); // early morning: warm, bright light for the first steps
     this.needFire = true;
-    setTimeout(() => this.hooks.toast('You wake in a moonlit clearing. You remember nothing — not even your face.', '#c8d8ff'), 1500);
-    setTimeout(() => this.hooks.toast('A light flickers between the trees.', '#e8d8a8'), 6000);
+    setTimeout(() => this.hooks.toast('You wake in a quiet clearing as the sun comes up. You remember nothing — not even your face.', '#c8d8ff'), 1500);
+    setTimeout(() => this.hooks.toast('Smoke rises between the trees. Someone has a fire.', '#e8d8a8'), 6000);
   }
 
   load(d: StorySave | undefined) {
@@ -193,7 +193,7 @@ export class Story {
     // objectives
     switch (this.step) {
       case 'wake': {
-        this.hooks.objective('Find the light in the woods', V(CAMPFIRE.x, 0, CAMPFIRE.z));
+        this.hooks.objective('Follow the smoke to the campfire', V(CAMPFIRE.x, 0, CAMPFIRE.z));
         if (!this.ambushDone && Math.hypot(p.x, p.z) > 12) this.ambush();
         break;
       }

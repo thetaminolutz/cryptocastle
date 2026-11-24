@@ -60,34 +60,74 @@ export function eyes(b: GeoBuilder, x: number, y: number, z: number, r: number, 
 }
 
 export interface Humanoid { h: number; w: number; skin: C3; cloth: C3; pants: C3; hood?: C3; eye: C3; eyeGlow?: number; hunch?: number; layer?: string; weapon?: 'dagger' | 'club' | 'sword' | 'spear' | 'none'; legs?: boolean }
+/** a capsule between two points */
+function seg(b: GeoBuilder, ax: number, ay: number, az: number, bx: number, by: number, bz: number, r0: number, r1: number, color: C3, bone: number, pivot: THREE.Vector3, layer = 'fabric') {
+  const A = V(ax, ay, az), B = V(bx, by, bz), len = A.distanceTo(B);
+  const g = new THREE.CylinderGeometry(r1, r0, len, 10, 2);
+  g.translate(0, len / 2, 0);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), B.clone().sub(A).normalize()));
+  g.translate(ax, ay, az);
+  add(b, g, color, bone, pivot, layer);
+  add(b, ell(r1, r1, r1, bx, by, bz, 10), color, bone, pivot, layer); // rounded joint
+}
+
 export function humanoid(b: GeoBuilder, o: Humanoid) {
-  const s = o.h / 1.8, w = o.w;
-  const hipY = 0.92 * s, shY = 1.42 * s, headY = 1.62 * s + (o.hunch ? -o.hunch * 0.15 : 0);
-  const headZ = -(o.hunch ?? 0) * 0.2;
-  // torso + belt
-  add(b, ell(0.2 * w, 0.32 * s, 0.13 * w, 0, 1.18 * s, (o.hunch ?? 0) * -0.05, 12), o.cloth, 0, V(), o.layer ?? 'fabric');
-  add(b, ell(0.17 * w, 0.06 * s, 0.12 * w, 0, hipY + 0.02, 0, 10), [0.2, 0.15, 0.1], 0, V());
-  // head
-  add(b, ell(0.105 * s, 0.125 * s, 0.11 * s, 0, headY, headZ, 12), o.skin, 5, V(0, 1.5 * s, 0));
-  if (o.hood) add(b, ell(0.135 * s, 0.15 * s, 0.14 * s, 0, headY + 0.03 * s, headZ + 0.02, 12), o.hood, 5, V(0, 1.5 * s, 0), 'fabric');
-  eyes(b, 0.038 * s, headY + 0.01, headZ - 0.1 * s, 0.017 * s, o.eye, o.eyeGlow ?? 0.25, 5, V(0, 1.5 * s, 0));
-  // arms: left = bone 1, right (weapon) = bone 9
-  for (const [side, bone] of [[-1, 1], [1, 9]] as const) {
-    const x = side * 0.24 * w;
-    add(b, cap(0.055 * w, 0.48 * s, x, shY, 0), o.cloth, bone, V(x, shY, 0), o.layer ?? 'fabric');
-    add(b, ell(0.045 * w, 0.055 * s, 0.045 * w, x, shY - 0.62 * s, 0, 8), o.skin, bone, V(x, shY, 0));
+  const s = o.h / 1.8, w = o.w, hu = o.hunch ?? 0;
+  const L = o.layer ?? 'fabric';
+  const hipY = 0.93 * s, shY = 1.44 * s, headY = 1.67 * s - hu * 0.16;
+  const lean = hu * 0.14; // the upper body leans forward when hunched
+  const headZ = -hu * 0.22;
+  const dark: C3 = [o.cloth[0] * 0.6, o.cloth[1] * 0.6, o.cloth[2] * 0.6];
+  // ---- torso: pelvis, waist, ribcage, shoulders
+  add(b, ell(0.17 * w, 0.1 * s, 0.12 * w, 0, hipY + 0.04 * s, 0, 12), o.pants, 0, V(), L);
+  add(b, ell(0.15 * w, 0.15 * s, 0.11 * w, 0, 1.12 * s, -lean * 0.4, 12), o.cloth, 0, V(), L);
+  add(b, ell(0.19 * w, 0.17 * s, 0.13 * w, 0, 1.31 * s, -lean * 0.8, 14), o.cloth, 0, V(), L);
+  for (const sd of [-1, 1]) add(b, ell(0.085 * w, 0.075 * s, 0.09 * w, sd * 0.19 * w, shY - 0.01 * s, -lean, 10), o.cloth, 0, V(), L);
+  add(b, ell(0.175 * w, 0.035 * s, 0.125 * w, 0, hipY + 0.11 * s, 0, 12), [0.18, 0.13, 0.09], 0, V()); // belt
+  add(b, ell(0.03 * w, 0.03 * s, 0.015, 0, hipY + 0.11 * s, -0.125 * w, 6), [0.75, 0.6, 0.3], 0, V()); // buckle
+  // tunic hem flaring over the hips
+  const hem = new THREE.CylinderGeometry(0.17 * w, 0.21 * w, 0.26 * s, 14, 1, true); hem.translate(0, hipY - 0.06 * s, 0);
+  add(b, hem, dark, 0, V(), L);
+  // ---- neck and head
+  const hp = V(0, 1.52 * s, -lean);
+  seg(b, 0, 1.48 * s, -lean, 0, headY - 0.08 * s, headZ, 0.05 * s, 0.045 * s, o.skin, 5, hp, 'white');
+  add(b, ell(0.098 * s, 0.118 * s, 0.108 * s, 0, headY, headZ, 14), o.skin, 5, hp, 'white');            // cranium
+  add(b, ell(0.074 * s, 0.05 * s, 0.08 * s, 0, headY - 0.075 * s, headZ - 0.025 * s, 10), o.skin, 5, hp, 'white'); // jaw
+  add(b, ell(0.082 * s, 0.018 * s, 0.03 * s, 0, headY + 0.025 * s, headZ - 0.088 * s, 8), [o.skin[0] * 0.85, o.skin[1] * 0.85, o.skin[2] * 0.85], 5, hp, 'white'); // brow ridge
+  const nose = new THREE.ConeGeometry(0.016 * s, 0.05 * s, 6); nose.rotateX(-Math.PI / 2 - 0.4); nose.translate(0, headY - 0.02 * s, headZ - 0.112 * s);
+  add(b, nose, o.skin, 5, hp, 'white');
+  for (const sd of [-1, 1]) add(b, ell(0.015 * s, 0.03 * s, 0.022 * s, sd * 0.1 * s, headY - 0.005 * s, headZ, 6), o.skin, 5, hp, 'white'); // ears
+  if (o.hood) {
+    add(b, ell(0.128 * s, 0.14 * s, 0.135 * s, 0, headY + 0.025 * s, headZ + 0.02 * s, 14), o.hood, 5, hp, 'fabric');
+    const drape = new THREE.ConeGeometry(0.2 * w, 0.22 * s, 12, 1, true); drape.translate(0, 1.47 * s, -lean + 0.02); add(b, drape, o.hood, 0, V(), 'fabric');
   }
-  // weapon in the right hand
-  const hx = 0.24 * w, hy = shY - 0.62 * s;
-  if (o.weapon === 'dagger') { const g = new THREE.ConeGeometry(0.02, 0.3, 4); g.rotateX(-Math.PI / 2); g.translate(hx, hy, -0.18); add(b, g, [0.7, 0.7, 0.72], 9, V(hx, shY, 0)); }
-  if (o.weapon === 'club') { const g = new THREE.CylinderGeometry(0.06, 0.03, 0.75, 6); g.rotateX(-Math.PI / 2.4); g.translate(hx, hy + 0.05, -0.3); add(b, g, [0.4, 0.28, 0.18], 9, V(hx, shY, 0), 'bark_oak'); }
-  if (o.weapon === 'sword') { const g = new THREE.BoxGeometry(0.05, 0.02, 0.8); g.translate(hx, hy, -0.42); add(b, g, [0.62, 0.6, 0.58], 9, V(hx, shY, 0)); }
-  if (o.weapon === 'spear') { const g = new THREE.CylinderGeometry(0.018, 0.018, 1.5 * s, 5); g.rotateX(-Math.PI / 2.2); g.translate(hx, hy + 0.1, -0.45); add(b, g, [0.45, 0.32, 0.2], 9, V(hx, shY, 0)); const t = new THREE.ConeGeometry(0.035, 0.16, 4); t.rotateX(-Math.PI / 2.2); t.translate(hx, hy + 0.16, -1.15 * s); add(b, t, [0.6, 0.6, 0.62], 9, V(hx, shY, 0)); }
-  // legs: left = bone 2, right = bone 4
-  if (o.legs !== false) for (const [side, bone] of [[-1, 2], [1, 4]] as const) {
-    const x = side * 0.1 * w;
-    add(b, cap(0.07 * w, 0.72 * s, x, hipY, 0), o.pants, bone, V(x, hipY, 0), o.layer ?? 'fabric');
-    add(b, ell(0.06 * w, 0.05, 0.11 * w, x, 0.05, -0.04, 8), [0.18, 0.13, 0.1], bone, V(x, hipY, 0));
+  eyes(b, 0.036 * s, headY + 0.005 * s, headZ - 0.098 * s, 0.015 * s, o.eye, o.eyeGlow ?? 0.25, 5, hp);
+  // ---- arms: shoulder → elbow (sleeve) → wrist (skin) → hand; left = bone 1, right (weapon) = bone 9
+  const hx = 0.255 * w, hy = shY - 0.6 * s, hz = -0.07 - lean;
+  for (const [sd, bone] of [[-1, 1], [1, 9]] as const) {
+    const x0 = sd * 0.21 * w, ex = sd * 0.25 * w, ey = shY - 0.3 * s, ez = -lean + 0.02;
+    const piv = V(x0, shY, -lean);
+    seg(b, x0, shY, -lean, ex, ey, ez, 0.058 * w, 0.048 * w, o.cloth, bone, piv, L);
+    seg(b, ex, ey, ez, sd * hx, hy + 0.06 * s, hz, 0.044 * w, 0.034 * w, o.skin, bone, piv, 'white');
+    add(b, ell(0.035 * w, 0.05 * s, 0.045 * w, sd * hx, hy, hz, 8), o.skin, bone, piv, 'white');
+    add(b, ell(0.05 * w, 0.03 * s, 0.05 * w, sd * hx * 0.99, hy + 0.1 * s, hz + 0.01, 8), [0.22, 0.16, 0.11], bone, piv); // cuff
+  }
+  // ---- weapon in the right hand
+  const wp = V(0.21 * w, shY, -lean);
+  if (o.weapon === 'dagger') { const g = new THREE.ConeGeometry(0.02, 0.3, 4); g.rotateX(-Math.PI / 2); g.translate(hx, hy, hz - 0.17); add(b, g, [0.7, 0.7, 0.72], 9, wp); }
+  if (o.weapon === 'club') { const g = new THREE.CylinderGeometry(0.06, 0.03, 0.75, 7); g.rotateX(-Math.PI / 2.4); g.translate(hx, hy + 0.05, hz - 0.28); add(b, g, [0.4, 0.28, 0.18], 9, wp, 'bark_oak'); }
+  if (o.weapon === 'sword') {
+    const bl = new THREE.BoxGeometry(0.05, 0.012, 0.78); bl.translate(hx, hy, hz - 0.45); add(b, bl, [0.75, 0.74, 0.72], 9, wp, 'white');
+    const gd = new THREE.BoxGeometry(0.16, 0.025, 0.03); gd.translate(hx, hy, hz - 0.05); add(b, gd, [0.55, 0.45, 0.25], 9, wp);
+  }
+  if (o.weapon === 'spear') { const g = new THREE.CylinderGeometry(0.018, 0.018, 1.5 * s, 5); g.rotateX(-Math.PI / 2.2); g.translate(hx, hy + 0.1, hz - 0.42); add(b, g, [0.45, 0.32, 0.2], 9, wp, 'bark_oak'); const t = new THREE.ConeGeometry(0.035, 0.16, 4); t.rotateX(-Math.PI / 2.2); t.translate(hx, hy + 0.16, hz - 1.1 * s); add(b, t, [0.6, 0.6, 0.62], 9, wp); }
+  // ---- legs: hip → knee → ankle, boots; left = bone 2, right = bone 4
+  if (o.legs !== false) for (const [sd, bone] of [[-1, 2], [1, 4]] as const) {
+    const x = sd * 0.095 * w, piv = V(x, hipY, 0);
+    seg(b, x, hipY, 0, x * 1.05, 0.5 * s, -0.01, 0.078 * w, 0.058 * w, o.pants, bone, piv, L);
+    seg(b, x * 1.05, 0.5 * s, -0.01, x * 1.05, 0.12 * s, 0.01, 0.055 * w, 0.042 * w, o.pants, bone, piv, L);
+    seg(b, x * 1.05, 0.28 * s, 0, x * 1.05, 0.07 * s, 0.01, 0.06 * w, 0.055 * w, [0.2, 0.14, 0.1], bone, piv, 'fabric'); // boot shaft
+    add(b, ell(0.058 * w, 0.045 * s, 0.12 * w, x * 1.05, 0.045 * s, -0.045, 10), [0.16, 0.11, 0.08], bone, piv);       // foot
   }
 }
 

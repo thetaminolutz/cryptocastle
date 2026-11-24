@@ -12,15 +12,15 @@ interface Key {
 }
 // t: 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset. Colours are sRGB hex.
 const RAW: Key[] = [
-  { t: 0.0, zenith: 0x040814, horizon: 0x0e1830, glow: 0x000000, glowI: 0, light: 0x7890c8, lightI: 0.6, sky: 0x2a3a60, skyI: 0.8, ground: 0x10141e, groundI: 0.4 },
-  { t: 0.21, zenith: 0x060a1c, horizon: 0x1c2040, glow: 0x302040, glowI: 0.3, light: 0x7890c8, lightI: 0.5, sky: 0x2a3456, skyI: 0.75, ground: 0x0c0c14, groundI: 0.3 },
+  { t: 0.0, zenith: 0x081028, horizon: 0x18264a, glow: 0x000000, glowI: 0, light: 0x8aa0d8, lightI: 0.85, sky: 0x3a4a78, skyI: 1.05, ground: 0x181c2a, groundI: 0.55 },
+  { t: 0.21, zenith: 0x060a1c, horizon: 0x1c2040, glow: 0x302040, glowI: 0.3, light: 0x8aa0d8, lightI: 0.7, sky: 0x3a4470, skyI: 0.95, ground: 0x14141e, groundI: 0.45 },
   { t: 0.25, zenith: 0x24365e, horizon: 0xe07848, glow: 0xff8a40, glowI: 1.6, light: 0xffa060, lightI: 1.2, sky: 0x6a6a8a, skyI: 0.55, ground: 0x3a2a22, groundI: 0.4 },
   { t: 0.3, zenith: 0x2a5cb8, horizon: 0xd8c4b0, glow: 0xffc890, glowI: 1.0, light: 0xffe0b8, lightI: 2.6, sky: 0x8aa8d8, skyI: 0.75, ground: 0x5a4a3a, groundI: 0.45 },
   { t: 0.5, zenith: 0x1e56c8, horizon: 0xa8c8ec, glow: 0xfff0d8, glowI: 0.7, light: 0xfff4e2, lightI: 3.3, sky: 0x9ab8e8, skyI: 0.85, ground: 0x6a5a48, groundI: 0.5 },
   { t: 0.7, zenith: 0x2a58b0, horizon: 0xe4c0a4, glow: 0xffc080, glowI: 1.0, light: 0xffdcb0, lightI: 2.6, sky: 0x8aa0d0, skyI: 0.75, ground: 0x5a4a3a, groundI: 0.45 },
   { t: 0.75, zenith: 0x302c5a, horizon: 0xff6630, glow: 0xff6a28, glowI: 1.8, light: 0xff7a3a, lightI: 1.2, sky: 0x6a5a7a, skyI: 0.55, ground: 0x3a2420, groundI: 0.4 },
-  { t: 0.79, zenith: 0x0e1230, horizon: 0x4a2440, glow: 0x6a2a40, glowI: 0.5, light: 0x7890c8, lightI: 0.45, sky: 0x2a2e50, skyI: 0.7, ground: 0x0c0c14, groundI: 0.3 },
-  { t: 1.0, zenith: 0x040814, horizon: 0x0e1830, glow: 0x000000, glowI: 0, light: 0x7890c8, lightI: 0.6, sky: 0x2a3a60, skyI: 0.8, ground: 0x10141e, groundI: 0.4 }
+  { t: 0.79, zenith: 0x0e1230, horizon: 0x4a2440, glow: 0x6a2a40, glowI: 0.5, light: 0x8aa0d8, lightI: 0.65, sky: 0x3a3e68, skyI: 0.9, ground: 0x14141e, groundI: 0.45 },
+  { t: 1.0, zenith: 0x081028, horizon: 0x18264a, glow: 0x000000, glowI: 0, light: 0x8aa0d8, lightI: 0.85, sky: 0x3a4a78, skyI: 1.05, ground: 0x181c2a, groundI: 0.55 }
 ];
 const C = (h: number) => new THREE.Color(h); // sRGB hex → linear (colour management on)
 const KEYS = RAW.map((k) => ({

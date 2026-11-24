@@ -61,6 +61,7 @@ import { SETS } from '../data/gear';
 import { playScene } from '../ui/scene';
 import { Soundscape } from './soundscape';
 import { Hints } from './hints';
+import { Fx, fxKindFor } from './fx';
 import { SORCERER } from '../data/story';
 import { ENEMIES } from '../data/enemies';
 
@@ -96,6 +97,8 @@ export class Game {
   get heraldNear() { return this.herald.present; }
   get isUnderwater() { return this.underwater; }
   private soundT = 0;
+  readonly fx = new Fx();
+  private hitStop = 0;
   readonly sound: Soundscape;
   private hints!: Hints;
   /** for hints */
@@ -185,6 +188,7 @@ export class Game {
     this.villagers = new Villagers(ui, this.world, this.gen, this.building, this.shadows, this.creatures);
     this.scene.add(this.sky.mesh, this.world.group, this.wildlife.group, this.model.root, this.weather.mesh, this.sunLight, this.hemi, this.props.group, this.building.group, this.creatures.group, this.lostMarker, this.villagers.group);
     this.shadows.add(this.model.root);
+    this.scene.add(this.model.trail, this.fx.points);
     this.scene.fog = this.fog;
     // a soft environment for metal and gloss on the hero, weapons and shields
     const pmrem = new THREE.PMREMGenerator(this.renderer.gl);
@@ -247,6 +251,12 @@ export class Game {
       onLevel: (lv) => { this.hotbar.notify(`You're a ${levelWord(lv)} now.`, '#f0d070'); audio.levelUp(); if (lv % 5 === 0) this.logEvent('level', `Became a ${levelWord(lv)}`); }
     });
     this.interaction.combat = this.combat;
+    this.combat.onLand = (c, heavy) => {
+      const at = c.pos.clone().setY(c.pos.y + c.hover + c.def.height * (c.def.scale ?? 1) * 0.6);
+      const dir = c.pos.clone().sub(this.player.pos).setY(0).normalize();
+      this.fx.burst(at, fxKindFor(c.def.id), dir, heavy ? 26 : 14);
+      this.hitStop = Math.max(this.hitStop, heavy ? 0.11 : 0.06);
+    };
     this.projectiles = new Projectiles(this.world, this.creatures, this.player, {
       hitCreature: (c, dmg, type, from) => this.combat.projectileHit(c, dmg, type, from),
       hitPlayer: (from, dmg, type, status, name) => this.combat.hitPlayer(from, dmg, type, status, name),
@@ -784,6 +794,9 @@ export class Game {
   }
 
   private frame(dt: number) {
+    // hit-stop: the world holds its breath for a moment when a blow lands
+    if (this.hitStop > 0) { this.hitStop -= dt; dt *= 0.1; }
+    this.fx.update(dt);
     this.elapsed += dt;
     input.poll(dt);
     if (!this.spawned) this.trySpawn();

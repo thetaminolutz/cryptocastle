@@ -59,6 +59,8 @@ export class Combat {
   /** Damage multiplier from levels. */
   /** character perks: damage, life steal, fire/curse chance, extra block, crit chance */
   perks = { dmg: 1, lifesteal: 0, fire: 0, curse: 0, block: 0, crit: 0.08, frost: 0, ranged: 0, attackSpeed: 0, xp: 1, gold: 1, fireRes: 0, poisonRes: 0 };
+  /** a blow landed on a creature (particles, hit-stop) */
+  onLand: ((c: Creature, heavy: boolean) => void) | null = null;
   /** play-style events for the Herald's watcher */
   onEvent: ((e: 'parry' | 'block' | 'hit' | 'swing' | 'shot' | 'proc', kind?: string) => void) | null = null;
   /** fires a projectile (set by the game) */
@@ -132,6 +134,7 @@ export class Combat {
       this.number(c.pos.clone().setY(c.pos.y + c.def.height + c.hover), String(Math.round(dmg)), eff > 1.05 ? '#ffd040' : eff < 0.95 ? '#9a9a9a' : '#ffffff', crit || heavy);
       this.lastHit = c;
       hit = true;
+      this.onLand?.(c, heavy || crit);
       if (this.perks.lifesteal) p.life = Math.min(p.maxLife, p.life + dmg * this.perks.lifesteal);
       if (c.state !== 'dead' && Math.random() < this.perks.fire) { c.burn = Math.max(c.burn, 3); this.onEvent?.('proc'); }
       if (c.state !== 'dead' && Math.random() < this.perks.frost) { this.creatures.stun(c, 1.1); this.number(c.pos.clone().setY(c.pos.y + c.def.height + 0.4), 'Frozen', '#a8e0ff'); }
@@ -197,6 +200,7 @@ export class Combat {
     const eff = c.def.weak[type] ?? 1;
     this.number(c.pos.clone().setY(c.pos.y + c.def.height + c.hover), String(Math.round(dealt)), eff > 1.05 ? '#ffd040' : eff < 0.95 ? '#9a9a9a' : '#ffffff', crit);
     this.lastHit = c;
+    this.onLand?.(c, crit);
     audio.impact(false);
     if (this.perks.lifesteal) this.player.life = Math.min(this.player.maxLife, this.player.life + dealt * this.perks.lifesteal * 0.5);
     if (c.state === 'dead') this.onKill(c);
